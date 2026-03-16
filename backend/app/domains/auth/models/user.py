@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -22,17 +20,23 @@ class User(SQLModel, table=True):
     )
     email: str = Field(sa_column=Column(String(255), nullable=False, unique=True, index=True))
     password_hash: str = Field(sa_column=Column(String(255), nullable=False))
+    first_name: str = Field(sa_column=Column(String(100), nullable=False))
+    last_name: str = Field(sa_column=Column(String(100), nullable=False))
+    phone: str | None = Field(default=None, sa_column=Column(String(30), nullable=True))
+    position: str | None = Field(default=None, sa_column=Column(String(100), nullable=True))
     is_active: bool = Field(default=True, nullable=False)
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=func.now()),
     )
     updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
             server_default=func.now(),
             onupdate=func.now(),
-        )
+        ),
     )
 
-    refresh_tokens: list[RefreshToken] = Relationship(back_populates="user")
+    refresh_tokens: list["RefreshToken"] = Relationship(back_populates="user")

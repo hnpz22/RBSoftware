@@ -1,0 +1,203 @@
+export interface User {
+  public_id: string
+  email: string
+  first_name: string
+  last_name: string
+  phone: string | null
+  position: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Product {
+  public_id: string
+  sku: string
+  name: string
+  type: 'KIT' | 'COMPONENT'
+  description: string | null
+  qr_code: string | null
+  is_active: boolean
+  cut_file_key: string | null
+  cut_file_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface KitBomItem {
+  component_public_id: string
+  component_sku: string
+  component_name: string
+  quantity: number
+  notes: string | null
+  created_at: string
+}
+
+export interface LocationRead {
+  public_id: string
+  name: string
+  type: string
+  address: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface OrderItem {
+  id: number
+  product_id: number
+  quantity: number
+  unit_price: string
+  snapshot_name: string | null
+  snapshot_sku: string | null
+}
+
+export interface SalesOrder {
+  public_id: string
+  external_id: string | null
+  source: string
+  status: string
+  fulfillment_status: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string | null
+  shipping_address: string | null
+  billing_address: string | null
+  notes: string | null
+  qr_token: string | null
+  created_by_name: string | null
+  approved_at: string | null
+  snapshot_frozen_at: string | null
+  created_at: string
+  updated_at: string
+  items: OrderItem[]
+}
+
+export interface StockLocation {
+  public_id: string
+  name: string
+  type: string
+}
+
+export interface InventorySummaryItem {
+  product_id: number
+  status: string
+  total_quantity: number
+}
+
+export interface ProductionBlock {
+  id: number
+  component_id: number
+  missing_qty: number
+  resolved_at: string | null
+}
+
+export interface BatchItemRead {
+  batch_item_id: number
+  product_id: number
+  product_sku: string
+  product_name: string
+  required_qty_total: number
+  available_stock_qty: number
+  to_produce_qty: number
+  produced_qty: number
+  blocks: ProductionBlock[]
+}
+
+export interface LinkedOrderRead {
+  sales_order_id: number
+  link_mode: string
+}
+
+export interface ProductionBatch {
+  public_id: string
+  kind: string
+  status: string
+  name: string | null
+  notes: string | null
+  cutoff_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+  items: BatchItemRead[]
+  linked_orders: LinkedOrderRead[]
+}
+
+export interface BomComponentDetail {
+  component_id: number
+  component_sku: string
+  component_name: string
+  qty_per_kit: number
+  total_needed: number
+  available: number
+  missing: number
+}
+
+export interface MasterSheetItem {
+  batch_item_id: number
+  product_id: number
+  product_sku: string
+  product_name: string
+  required_qty_total: number
+  available_stock_qty: number
+  to_produce_qty: number
+  produced_qty: number
+  bom: BomComponentDetail[]
+  blocks: ProductionBlock[]
+}
+
+export interface MasterSheetResponse {
+  batch_public_id: string
+  kind: string
+  status: string
+  name: string | null
+  cutoff_at: string | null
+  items: MasterSheetItem[]
+  linked_orders: LinkedOrderRead[]
+}
+
+export interface PackItem {
+  id: number
+  public_id: string
+  sales_order_id: number
+  product_id: number
+  required_qty: number
+  confirmed_qty: number
+}
+
+export interface PackEvent {
+  id: number
+  event_type: string
+  quantity: number | null
+  scanned_qr: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface PackStatusResponse {
+  order_public_id: string
+  fulfillment_status: string
+  items: PackItem[]
+  events: PackEvent[]
+}
+
+export interface Role {
+  public_id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Permission {
+  public_id: string
+  code: string
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ApiError {
+  status: number
+  detail: string
+}

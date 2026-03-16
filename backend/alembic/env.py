@@ -5,7 +5,15 @@ from sqlmodel import SQLModel
 
 from alembic import context
 from app.core.config import settings
+from app.domains.audit import models as audit_models  # noqa: F401
 from app.domains.auth import models as auth_models  # noqa: F401
+from app.domains.catalog import models as catalog_models  # noqa: F401
+from app.domains.commercial import models as commercial_models  # noqa: F401
+from app.domains.production import models as production_models  # noqa: F401
+from app.domains.inventory import models as inventory_models  # noqa: F401
+from app.domains.fulfillment import models as fulfillment_models  # noqa: F401
+from app.domains.integrations import models as integrations_models  # noqa: F401
+from app.domains.rbac import models as rbac_models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
