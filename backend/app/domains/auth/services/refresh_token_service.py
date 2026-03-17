@@ -45,3 +45,13 @@ class RefreshTokenService:
             return False
         repo.update(record, RefreshTokenUpdate(revoked_at=datetime.now(timezone.utc)))
         return True
+
+    def revoke_all_for_user(self, session: Session, user_id: int) -> int:
+        repo = RefreshTokenRepository(session)
+        now = datetime.now(timezone.utc)
+        count = 0
+        for record in repo.list_by_user_id(user_id):
+            if record.revoked_at is None:
+                repo.update(record, RefreshTokenUpdate(revoked_at=now))
+                count += 1
+        return count

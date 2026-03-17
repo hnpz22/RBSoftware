@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -27,7 +28,15 @@ def list_roles(
     session: Session = Depends(get_session),
     _: object = Depends(get_current_user),
 ) -> list[RoleRead]:
-    return [RoleRead.model_validate(r) for r in _role_svc.list_roles(session)]
+    roles = _role_svc.list_roles(session)
+    rp_repo = RolePermissionRepository(session)
+    counts: dict[int, int] = defaultdict(int)
+    for rp in rp_repo.list():
+        counts[rp.role_id] += 1
+    return [
+        RoleRead.model_validate(r).model_copy(update={"permission_count": counts.get(r.id, 0)})
+        for r in roles
+    ]
 
 
 @router.post("", response_model=RoleRead, status_code=status.HTTP_201_CREATED)

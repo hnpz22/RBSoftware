@@ -111,34 +111,30 @@ domains/{domain}/
 
 ## 5. Dominios del sistema
 
-### Estado actual (MVP en construcción)
+### Estado actual — todos los dominios implementados ✅
 
 | Dominio | Modelos | Schemas | Repos | Servicios | Rutas | Migración |
 |---|---|---|---|---|---|---|
-| auth | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| rbac | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| audit | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| catalog | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| commercial | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| inventory | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| production | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| fulfillment | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| integrations | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| rbac | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| audit | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| catalog | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| commercial | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| inventory | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| production | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fulfillment | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| integrations | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-### Orden de implementación acordado
+### Próximo dominio en desarrollo
 
-```
-1. auth          → completar endpoints (login, logout, refresh, me)
-2. rbac          → completar servicios y endpoints
-3. audit         → implementar completo
-4. catalog       → productos, kits, BOM, chasis
-5. commercial    → órdenes, aprobación, snapshot
-6. inventory     → balances y movimientos (kits + componentes)
-7. production    → batches, hora de corte, hoja maestra
-8. fulfillment   → packing, QR, cierre
-9. integrations  → WooCommerce, Wompi
-10. frontend     → sobre servicios ya estables
-```
+`academic` — LMS para colegios (en diseño). Ver AGENTS.md.
+
+### Páginas frontend funcionales
+
+`/login`, `/dashboard`, `/orders`, `/orders/[id]`, `/orders/new`,
+`/catalog`, `/catalog/[id]`, `/inventory`, `/production`,
+`/production/[id]`, `/fulfillment`, `/fulfillment/[id]`,
+`/settings/users`, `/settings/roles`, `/reports`
 
 ---
 
@@ -223,16 +219,15 @@ domains/{domain}/
 
 El modelo completo está en `db.sql` (formato DBML) en la raíz del repo.
 
-### Tablas implementadas (migración inicial)
-1. `users`
-2. `refresh_tokens`
-3. `roles`
-4. `permissions`
-5. `role_permissions`
-6. `user_roles`
+### Todas las tablas migradas
 
-### Tablas pendientes de migración (16)
-`audit_logs`, `products`, `kit_bom_items`, `sales_orders`, `sales_order_items`, `sales_order_pack_items`, `sales_order_pack_events`, `production_batches`, `production_batch_sales_orders`, `production_batch_items`, `production_item_counters`, `production_blocks`, `stock_locations`, `inventory_balances`, `inventory_movements`, `component_inventory_balances`, `component_inventory_movements`, `integration_sync_state`
+`users`, `refresh_tokens`, `roles`, `permissions`, `role_permissions`,
+`user_roles`, `audit_logs`, `products`, `kit_bom_items`, `sales_orders`,
+`sales_order_items`, `sales_order_pack_items`, `sales_order_pack_events`,
+`production_batches`, `production_batch_sales_orders`, `production_batch_items`,
+`production_item_counters`, `production_blocks`, `stock_locations`,
+`inventory_balances`, `inventory_movements`, `component_inventory_balances`,
+`component_inventory_movements`, `integration_sync_state`
 
 ---
 

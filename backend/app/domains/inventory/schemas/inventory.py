@@ -49,3 +49,13 @@ class ManualAdjustmentCreate(SQLModel):
     status: StockStatus
     delta: int  # positive = add, negative = subtract
     notes: str | None = None
+
+
+class StockAlertItem(SQLModel):
+    """Per-product stock alert with semaphore color."""
+
+    product_id: int
+    product_name: str
+    sku: str
+    total_free: int
+    status_color: str  # 'RED' | 'YELLOW' | 'GREEN'

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlmodel import Session
+
+from app.domains.audit.services import AuditService
 
 from app.core.database import get_session
 from app.domains.auth.dependencies import get_current_user
@@ -15,6 +17,7 @@ from app.domains.auth.services.user_service import UserService
 router = APIRouter(prefix="/auth/users", tags=["auth"])
 
 _svc = UserService()
+_audit = AuditService()
 
 
 class CreateUserRequest(BaseModel):
@@ -31,6 +34,11 @@ class UpdateUserRequest(BaseModel):
     last_name: str | None = None
     phone: str | None = None
     position: str | None = None
+    is_active: bool | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    new_password: str
 
 
 @router.get("", response_model=list[UserRead])
@@ -56,6 +64,7 @@ def update_user(
         last_name=data.last_name,
         phone=data.phone,
         position=data.position,
+        is_active=data.is_active,
     )
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -81,3 +90,33 @@ def create_user(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return UserRead.model_validate(user)
+
+
+@router.patch("/{user_id}/password", status_code=status.HTTP_200_OK)
+def change_password(
+    user_id: UUID,
+    data: ChangePasswordRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    try:
+        _svc.change_password(
+            session,
+            public_id=user_id,
+            new_password=data.new_password,
+            current_user_public_id=current_user.public_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    _audit.log(
+        session,
+        user_id=current_user.id,
+        action="user.password_changed",
+        resource_type="user",
+        resource_id=str(user_id),
+        ip=request.client.host if request.client else None,
+    )
+    return {"message": "Password updated"}

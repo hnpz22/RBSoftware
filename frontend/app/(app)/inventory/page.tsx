@@ -6,30 +6,34 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import type { InventorySummaryItem, LocationRead, Product } from '@/lib/types'
+import type { LocationRead, Product, StockAlert } from '@/lib/types'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Semaphore dot ─────────────────────────────────────────────────────────────
 
-const STATUS_VARIANT: Record<string, string> = {
-  FREE: 'success',
-  RESERVED_WEB: 'info',
-  RESERVED_FAIR: 'info',
-  PACKED: 'purple',
-  SHIPPED: 'success',
-  DELIVERED: 'success',
-  BLOCKED: 'destructive',
-  DAMAGED: 'destructive',
-  LOST: 'muted',
+const DOT_CLASS: Record<string, string> = {
+  RED:    'bg-red-500',
+  YELLOW: 'bg-yellow-400',
+  GREEN:  'bg-green-500',
 }
 
-function groupByProduct(rows: InventorySummaryItem[]) {
-  const map = new Map<number, InventorySummaryItem[]>()
-  for (const row of rows) {
-    if (!map.has(row.product_id)) map.set(row.product_id, [])
-    map.get(row.product_id)!.push(row)
-  }
-  return map
+function Dot({ color }: { color: string }) {
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ${DOT_CLASS[color] ?? 'bg-muted'}`}
+    />
+  )
 }
+
+// ── Color filter config ───────────────────────────────────────────────────────
+
+type ColorFilter = 'ALL' | 'RED' | 'YELLOW' | 'GREEN'
+
+const COLOR_BUTTONS: { value: ColorFilter; label: string }[] = [
+  { value: 'ALL',    label: 'Todos' },
+  { value: 'RED',    label: '🔴 Sin stock' },
+  { value: 'YELLOW', label: '🟡 Stock bajo' },
+  { value: 'GREEN',  label: '🟢 OK' },
+]
 
 // ── Section tabs ──────────────────────────────────────────────────────────────
 
@@ -40,10 +44,10 @@ type Section = 'balances' | 'locations'
 export default function InventoryPage() {
   const [section, setSection] = useState<Section>('balances')
 
-  // Balances state
-  const [summary, setSummary] = useState<InventorySummaryItem[]>([])
-  const [filterStatus, setFilterStatus] = useState<string>('ALL')
-  const [loadingBalances, setLoadingBalances] = useState(true)
+  // Alerts state
+  const [alerts, setAlerts] = useState<StockAlert[]>([])
+  const [colorFilter, setColorFilter] = useState<ColorFilter>('ALL')
+  const [loadingAlerts, setLoadingAlerts] = useState(true)
 
   // Locations state
   const [locations, setLocations] = useState<LocationRead[]>([])
@@ -68,13 +72,22 @@ export default function InventoryPage() {
   const [adjError, setAdjError] = useState<string | null>(null)
   const [adjSuccess, setAdjSuccess] = useState<string | null>(null)
 
-  async function loadBalances() {
-    setLoadingBalances(true)
+  // Read ?color= param on mount to pre-filter (e.g. from dashboard link)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const color = params.get('color')?.toUpperCase()
+    if (color === 'RED' || color === 'YELLOW' || color === 'GREEN') {
+      setColorFilter(color)
+    }
+  }, [])
+
+  async function loadAlerts() {
+    setLoadingAlerts(true)
     try {
-      const data = await api.get<InventorySummaryItem[]>('/inventory/balances/summary')
-      setSummary(data)
+      const data = await api.get<StockAlert[]>('/inventory/alerts')
+      setAlerts(data)
     } finally {
-      setLoadingBalances(false)
+      setLoadingAlerts(false)
     }
   }
 
@@ -98,7 +111,7 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    loadBalances()
+    loadAlerts()
   }, [])
 
   useEffect(() => {
@@ -147,7 +160,7 @@ export default function InventoryPage() {
       })
       setAdjSuccess(`Stock ajustado: +${adjForm.delta} unidades FREE`)
       setAdjForm({ product_public_id: '', location_public_id: '', delta: '1', notes: '' })
-      await loadBalances()
+      await loadAlerts()
     } catch (err: any) {
       setAdjError(err.detail ?? 'Error al ajustar stock')
     } finally {
@@ -155,11 +168,15 @@ export default function InventoryPage() {
     }
   }
 
-  // ── Balances section ─────────────────────────────────────────────────────────
+  // ── Filtered alerts ───────────────────────────────────────────────────────────
 
-  const statuses = ['ALL', ...Array.from(new Set(summary.map((s) => s.status))).sort()]
-  const filtered = filterStatus === 'ALL' ? summary : summary.filter((s) => s.status === filterStatus)
-  const grouped = groupByProduct(filtered)
+  const filtered = colorFilter === 'ALL'
+    ? alerts
+    : alerts.filter((a) => a.status_color === colorFilter)
+
+  const redCount    = alerts.filter((a) => a.status_color === 'RED').length
+  const yellowCount = alerts.filter((a) => a.status_color === 'YELLOW').length
+  const greenCount  = alerts.filter((a) => a.status_color === 'GREEN').length
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -171,10 +188,10 @@ export default function InventoryPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={section === 'balances' ? loadBalances : loadLocations}
-          disabled={loadingBalances || loadingLocations}
+          onClick={section === 'balances' ? loadAlerts : loadLocations}
+          disabled={loadingAlerts || loadingLocations}
         >
-          <RefreshCw size={14} className={(loadingBalances || loadingLocations) ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={(loadingAlerts || loadingLocations) ? 'animate-spin' : ''} />
           <span className="ml-2">Actualizar</span>
         </Button>
       </div>
@@ -201,11 +218,22 @@ export default function InventoryPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {grouped.size} productos · {filtered.length} líneas
+              {alerts.length} productos ·{' '}
+              <span className="text-red-500 font-medium">{redCount} sin stock</span>
+              {' · '}
+              <span className="text-yellow-500 font-medium">{yellowCount} bajo</span>
+              {' · '}
+              <span className="text-green-600 font-medium">{greenCount} OK</span>
             </p>
             <Button
               size="sm"
-              onClick={() => { setShowAdjustForm(true); setAdjError(null); setAdjSuccess(null) }}
+              onClick={() => {
+                setShowAdjustForm(true)
+                loadLocations()
+                loadProducts()
+                setAdjError(null)
+                setAdjSuccess(null)
+              }}
             >
               <Plus size={14} className="mr-1" />
               Ajuste de inventario
@@ -297,68 +325,64 @@ export default function InventoryPage() {
             </div>
           )}
 
-          {/* Status filter pills */}
+          {/* Color filter pills */}
           <div className="flex flex-wrap gap-2">
-            {statuses.map((s) => (
+            {COLOR_BUTTONS.map(({ value, label }) => (
               <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
+                key={value}
+                onClick={() => setColorFilter(value)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  filterStatus === s
+                  colorFilter === value
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
               >
-                {s}
+                {label}
               </button>
             ))}
           </div>
 
-          {/* Balances table */}
+          {/* Alerts table */}
           <div className="rounded-lg border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Producto ID</th>
-                  <th className="px-4 py-3 text-left font-medium">Estado</th>
-                  <th className="px-4 py-3 text-right font-medium">Cantidad</th>
+                  <th className="px-4 py-3 text-left font-medium w-8">Estado</th>
+                  <th className="px-4 py-3 text-left font-medium">Producto</th>
+                  <th className="px-4 py-3 text-right font-medium w-28">Unidades FREE</th>
                 </tr>
               </thead>
               <tbody>
-                {loadingBalances && (
+                {loadingAlerts && (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
                       Cargando…
                     </td>
                   </tr>
                 )}
-                {!loadingBalances && grouped.size === 0 && (
+                {!loadingAlerts && filtered.length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
-                      Sin datos. Usa "Ajuste de inventario" para registrar stock.
+                      {alerts.length === 0
+                        ? 'Sin productos activos en catálogo.'
+                        : 'No hay productos con ese estado.'}
                     </td>
                   </tr>
                 )}
-                {Array.from(grouped.entries()).map(([productId, rows]) =>
-                  rows.map((row, i) => (
-                    <tr key={`${productId}-${row.status}`} className="border-b last:border-0">
-                      {i === 0 && (
-                        <td
-                          className="px-4 py-2 font-mono text-xs text-muted-foreground align-top"
-                          rowSpan={rows.length}
-                        >
-                          #{productId}
-                        </td>
-                      )}
-                      <td className="px-4 py-2">
-                        <Badge variant={(STATUS_VARIANT[row.status] ?? 'outline') as any}>
-                          {row.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-2 text-right font-medium">{row.total_quantity}</td>
-                    </tr>
-                  )),
-                )}
+                {filtered.map((alert) => (
+                  <tr key={alert.product_id} className="border-b last:border-0">
+                    <td className="px-4 py-3">
+                      <Dot color={alert.status_color} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium leading-tight">{alert.product_name}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{alert.sku}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {alert.total_free}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   BookOpen,
+  Building2,
   Factory,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Package,
   PackageCheck,
-  Settings2,
+  Plug,
+  Shield,
   ShoppingCart,
   Users2,
 } from 'lucide-react'
@@ -36,27 +39,27 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Operaciones',
     items: [
-      { href: '/dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
-      { href: '/orders',      label: 'Órdenes',       icon: ShoppingCart },
-      { href: '/catalog',     label: 'Catálogo',      icon: BookOpen },
-      { href: '/inventory',   label: 'Inventario',    icon: Package },
-      { href: '/production',  label: 'Producción',    icon: Factory },
-      { href: '/fulfillment', label: 'Fulfillment',   icon: PackageCheck },
+      { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+      { href: '/orders',      label: 'Órdenes',      icon: ShoppingCart },
+      { href: '/catalog',     label: 'Catálogo',     icon: BookOpen },
+      { href: '/inventory',   label: 'Inventario',   icon: Package },
+      { href: '/production',  label: 'Producción',   icon: Factory },
+      { href: '/fulfillment', label: 'Fulfillment',  icon: PackageCheck },
     ],
   },
   {
     title: 'Configuración',
     items: [
       { href: '/settings/users', label: 'Usuarios',          icon: Users2 },
-      { href: '/settings/roles', label: 'Roles y Permisos',  icon: Settings2 },
+      { href: '/settings/roles', label: 'Roles y Permisos',  icon: Shield },
     ],
   },
   {
     title: 'Próximamente',
     items: [
-      { href: '#', label: 'Académico',      icon: BookOpen,    soon: true, disabled: true },
-      { href: '#', label: 'Administrativo', icon: Package,     soon: true, disabled: true },
-      { href: '#', label: 'Integraciones',  icon: Settings2,   soon: true, disabled: true },
+      { href: '#', label: 'Académico',      icon: GraduationCap, soon: true, disabled: true },
+      { href: '#', label: 'Administrativo', icon: Building2,     soon: true, disabled: true },
+      { href: '#', label: 'Integraciones',  icon: Plug,          soon: true, disabled: true },
     ],
   },
 ]
@@ -84,9 +87,9 @@ export function Nav() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         {NAV_SECTIONS.map((section) => (
-          <div key={section.title} className="mb-4">
+          <div key={section.title} className="mb-2">
             {/* Section title */}
-            <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {section.title}
             </p>
 
@@ -100,7 +103,7 @@ export function Nav() {
                 return (
                   <div
                     key={label}
-                    className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm opacity-40"
+                    className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm opacity-50"
                   >
                     <Icon size={16} />
                     <span>{label}</span>

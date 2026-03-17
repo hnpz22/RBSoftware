@@ -1,16 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ShoppingCart, Factory, Package, TrendingUp } from 'lucide-react'
+import Link from 'next/link'
+import { ShoppingCart, Factory, Package, TrendingUp, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
-import type { SalesOrder, ProductionBatch, InventorySummaryItem } from '@/lib/types'
+import type { SalesOrder, ProductionBatch, StockAlert } from '@/lib/types'
 
 interface Stats {
   pendingOrders: number
   approvedOrders: number
   activeBatches: number
-  stockEntries: number
+  criticalStock: number   // RED products
 }
 
 function StatCard({
@@ -18,24 +19,43 @@ function StatCard({
   value,
   icon: Icon,
   sub,
+  href,
+  alert,
 }: {
   title: string
   value: number | string
   icon: React.ElementType
   sub?: string
+  href?: string
+  alert?: boolean
 }) {
-  return (
-    <Card>
+  const content = (
+    <Card className={alert && (value as number) > 0 ? 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20' : ''}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon size={18} className="text-muted-foreground" />
+        <Icon
+          size={18}
+          className={alert && (value as number) > 0 ? 'text-red-500' : 'text-muted-foreground'}
+        />
       </CardHeader>
       <CardContent>
-        <p className="text-3xl font-bold">{value}</p>
+        <p className={`text-3xl font-bold ${alert && (value as number) > 0 ? 'text-red-600' : ''}`}>
+          {value}
+        </p>
         {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
+        {href && (
+          <p className="mt-2 text-xs text-primary underline-offset-2 hover:underline">
+            Ver en inventario →
+          </p>
+        )}
       </CardContent>
     </Card>
   )
+
+  if (href) {
+    return <Link href={href}>{content}</Link>
+  }
+  return content
 }
 
 export default function DashboardPage() {
@@ -45,10 +65,10 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [orders, batches, summary] = await Promise.all([
+        const [orders, batches, alerts] = await Promise.all([
           api.get<SalesOrder[]>('/commercial/orders'),
           api.get<ProductionBatch[]>('/production/batches'),
-          api.get<InventorySummaryItem[]>('/inventory/balances/summary'),
+          api.get<StockAlert[]>('/inventory/alerts'),
         ])
 
         setStats({
@@ -57,7 +77,7 @@ export default function DashboardPage() {
           activeBatches: batches.filter((b) =>
             ['PENDING', 'IN_PROGRESS'].includes(b.status),
           ).length,
-          stockEntries: summary.filter((s) => s.status === 'FREE').length,
+          criticalStock: alerts.filter((a) => a.status_color === 'RED').length,
         })
       } catch {
         // show partial data or empty
@@ -112,10 +132,12 @@ export default function DashboardPage() {
           sub="En producción"
         />
         <StatCard
-          title="Líneas de Stock Libre"
-          value={stats?.stockEntries ?? 0}
-          icon={Package}
-          sub="Registros FREE en inventario"
+          title="Stock Crítico"
+          value={stats?.criticalStock ?? 0}
+          icon={AlertTriangle}
+          sub="Productos sin unidades FREE"
+          href="/inventory?color=RED"
+          alert
         />
       </div>
     </div>

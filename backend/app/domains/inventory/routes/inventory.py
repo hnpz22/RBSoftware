@@ -15,6 +15,7 @@ from app.domains.inventory.schemas import (
     BalanceSummaryItem,
     ManualAdjustmentCreate,
     MovementRead,
+    StockAlertItem,
 )
 from app.domains.inventory.services import InventoryService
 
@@ -39,6 +40,14 @@ def _resolve_location(session: Session, public_id: UUID) -> StockLocation:
             status_code=status.HTTP_404_NOT_FOUND, detail="Location not found"
         )
     return location
+
+
+@router.get("/alerts", response_model=list[StockAlertItem])
+def get_stock_alerts(
+    session: Session = Depends(get_session),
+    _=Depends(get_current_user),
+) -> list[StockAlertItem]:
+    return _svc.get_alerts(session)
 
 
 @router.get("/balances/summary", response_model=list[BalanceSummaryItem])

@@ -12,8 +12,13 @@ from app.domains.inventory.repositories import (
     InventoryMovementRepository,
     StockLocationRepository,
 )
-from app.domains.inventory.schemas.inventory import BalanceSummaryItem
+from app.domains.inventory.schemas.inventory import BalanceSummaryItem, StockAlertItem
 from app.domains.inventory.schemas.location import LocationCreate, LocationUpdate
+
+
+# ── Stock alert thresholds (tune here or move to settings later) ───────────────
+STOCK_RED_THRESHOLD = 0      # total_free == 0 → RED
+STOCK_YELLOW_THRESHOLD = 10  # total_free <= 10 → YELLOW, else GREEN
 
 
 class InventoryService:
@@ -215,6 +220,47 @@ class InventoryService:
             )
 
         return quantity - remaining
+
+    # ── Stock alerts ──────────────────────────────────────────────────────────
+
+    def get_alerts(self, session: Session) -> list[StockAlertItem]:
+        """Return semaphore alert per active KIT product, sorted RED→YELLOW→GREEN."""
+        from sqlmodel import select as _select
+
+        from app.domains.catalog.models.product import Product, ProductType
+
+        free_by_product = InventoryBalanceRepository(session).free_totals_by_product()
+
+        products = session.exec(
+            _select(Product).where(
+                Product.is_active == True,  # noqa: E712
+                Product.type == ProductType.KIT,
+            )
+        ).all()
+
+        _color_order = {"RED": 0, "YELLOW": 1, "GREEN": 2}
+
+        alerts: list[StockAlertItem] = []
+        for product in products:
+            total_free = free_by_product.get(product.id, 0)
+            if total_free <= STOCK_RED_THRESHOLD:
+                color = "RED"
+            elif total_free <= STOCK_YELLOW_THRESHOLD:
+                color = "YELLOW"
+            else:
+                color = "GREEN"
+            alerts.append(
+                StockAlertItem(
+                    product_id=product.id,
+                    product_name=product.name,
+                    sku=product.sku,
+                    total_free=total_free,
+                    status_color=color,
+                )
+            )
+
+        alerts.sort(key=lambda a: (_color_order[a.status_color], a.sku))
+        return alerts
 
     # ── Movements ─────────────────────────────────────────────────────────────
 

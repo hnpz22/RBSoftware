@@ -18,6 +18,7 @@ class RoleRead(SQLModel):
     public_id: UUID
     name: str
     description: str | None
+    permission_count: int = 0
     created_at: datetime
     updated_at: datetime
 

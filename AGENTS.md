@@ -71,41 +71,55 @@ Cada dominio tiene exactamente estas capas:
 
 | Dominio | Estado |
 |---|---|
-| auth | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ❌ |
-| rbac | modelos ✅ schemas ✅ repos ✅ servicios ❌ rutas ❌ |
-| audit | scaffold vacío |
-| catalog | scaffold vacío |
-| commercial | scaffold vacío |
-| inventory | scaffold vacío |
-| production | scaffold vacío |
-| fulfillment | scaffold vacío |
-| integrations | scaffold vacío |
-| frontend | scaffold estático, sin conexión al backend |
+| auth | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| rbac | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| audit | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| catalog | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| commercial | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| inventory | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| production | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| fulfillment | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| integrations | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| frontend | páginas funcionales conectadas al backend |
 
-Único endpoint funcional: `GET /health`
+Endpoints de auth:
+```
+POST   /auth/login
+POST   /auth/logout
+POST   /auth/refresh
+GET    /auth/me
+GET    /auth/users
+POST   /auth/users
+PATCH  /auth/users/{user_id}
+PATCH  /auth/users/{user_id}/password
+```
 
-Base de datos: 6 tablas migradas (auth + rbac). Las otras 16 están definidas en `db.sql` pero sin migración.
+Endpoints de RBAC:
+```
+GET    /rbac/roles
+POST   /rbac/roles
+DELETE /rbac/roles/{public_id}
+GET    /rbac/roles/{role_id}/permissions
+POST   /rbac/roles/{role_id}/permissions/{permission_id}
+DELETE /rbac/roles/{role_id}/permissions/{permission_id}
+GET    /rbac/permissions
+POST   /rbac/permissions
+GET    /rbac/users/{user_id}/roles
+POST   /rbac/users/{user_id}/roles/{role_id}
+DELETE /rbac/users/{user_id}/roles/{role_id}
+GET    /rbac/users/{user_id}/permissions
+```
+
+Frontend — interceptor de auto-refresh activo en `frontend/lib/api.ts`:
+si una llamada retorna 401, intenta `POST /auth/refresh` automáticamente
+y reintenta la request original. Si el refresh falla, redirige a `/login`.
 
 ---
 
-## Orden de implementación
+## Estado del sistema
 
-Sigue este orden. No saltes dominios.
-
-```
-1. auth          → endpoints: POST /auth/login, POST /auth/logout,
-                              POST /auth/refresh, GET /auth/me
-2. rbac          → servicios + endpoints CRUD de roles, permisos,
-                              asignación usuario-rol
-3. audit         → implementación completa
-4. catalog       → productos, kits, BOM, chasis
-5. commercial    → órdenes, aprobación, snapshot
-6. inventory     → balances y movimientos
-7. production    → batches, hora de corte
-8. fulfillment   → packing, QR, cierre
-9. integrations  → WooCommerce, Wompi
-10. frontend     → sobre servicios ya estables
-```
+Todos los dominios están implementados. El sistema está en fase de
+mantenimiento, mejoras y extensión de features.
 
 ---
 
@@ -245,3 +259,34 @@ class UserService:
 
 Ver `PROJECT_CONTEXT.md` para entender el negocio, los flujos y las fases de construcción.
 Ver `db.sql` para el modelo de datos completo y actualizado.
+
+---
+
+## Próximos dominios en desarrollo
+
+### academic (en diseño)
+Dominio LMS para colegios. Jerarquía:
+Colegio → Grado (Director) → Curso (Teacher) → Estudiante
+
+Tablas planificadas: schools, lms_grades, lms_grade_directors,
+lms_courses, lms_course_students, lms_units, lms_materials,
+lms_assignments, lms_submissions
+
+Roles LMS: ADMIN / DIRECTOR / TEACHER / STUDENT
+- DIRECTOR: personal del colegio, gestiona grados y cursos,
+  no da clases, ligado a un solo colegio
+- TEACHER: personal del colegio, gestiona contenido de sus
+  cursos, puede estar en varios cursos, no dirige grados
+- STUDENT: login propio, ve material publicado, entrega tareas
+
+Storage: MinIO para PDFs y archivos de entregas
+Keys: academic/{course_id}/materials/{uuid}.pdf
+      academic/{course_id}/submissions/{assignment_id}/
+      {student_id}/{uuid}.{ext}
+
+## Deuda técnica conocida
+- POST /auth/users no valida complejidad de contraseña en backend
+- change_password solo permite cambiar la propia contraseña —
+  extender cuando exista guard de permisos admin
+- No existe require_permission() como dependency inyectable —
+  la autorización se hace manualmente en cada servicio

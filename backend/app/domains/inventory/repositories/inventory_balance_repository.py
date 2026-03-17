@@ -50,6 +50,18 @@ class InventoryBalanceRepository:
             stmt = stmt.where(InventoryBalance.location_id == location_id)
         return list(self.session.exec(stmt.order_by(InventoryBalance.id)).all())
 
+    def free_totals_by_product(self) -> dict[int, int]:
+        """Sum FREE quantities per product_id across all locations."""
+        stmt = (
+            select(
+                InventoryBalance.product_id,
+                sa.func.sum(InventoryBalance.quantity).label("total"),
+            )
+            .where(InventoryBalance.status == StockStatus.FREE)
+            .group_by(InventoryBalance.product_id)
+        )
+        return {row[0]: int(row[1]) for row in self.session.exec(stmt).all()}
+
     def summary(self) -> list[tuple[int, str, int]]:
         """Returns (product_id, status, total_quantity) grouped by product and status."""
         stmt = (

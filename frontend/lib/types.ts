@@ -185,6 +185,7 @@ export interface Role {
   public_id: string
   name: string
   description: string | null
+  permission_count: number
   created_at: string
   updated_at: string
 }
@@ -195,6 +196,14 @@ export interface Permission {
   description: string | null
   created_at: string
   updated_at: string
+}
+
+export interface StockAlert {
+  product_id: number
+  product_name: string
+  sku: string
+  total_free: number
+  status_color: 'RED' | 'YELLOW' | 'GREEN'
 }
 
 export interface ApiError {

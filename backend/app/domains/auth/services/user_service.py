@@ -8,6 +8,7 @@ from app.core.security import hash_password, verify_password
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
 from app.domains.auth.schemas import UserCreate, UserUpdate
+from app.domains.auth.services.refresh_token_service import RefreshTokenService
 
 
 class UserService:
@@ -59,6 +60,7 @@ class UserService:
         last_name: str | None = None,
         phone: str | None = None,
         position: str | None = None,
+        is_active: bool | None = None,
     ) -> User | None:
         repo = UserRepository(session)
         user = repo.get_by_public_id(public_id)
@@ -71,5 +73,23 @@ class UserService:
                 last_name=last_name,
                 phone=phone,
                 position=position,
+                is_active=is_active,
             ),
         )
+
+    def change_password(
+        self,
+        session: Session,
+        public_id: UUID,
+        new_password: str,
+        current_user_public_id: UUID,
+    ) -> User:
+        repo = UserRepository(session)
+        user = repo.get_by_public_id(public_id)
+        if user is None:
+            raise LookupError("User not found")
+        if user.public_id != current_user_public_id:
+            raise PermissionError("Cannot change another user's password")
+        updated = repo.update(user, UserUpdate(password_hash=hash_password(new_password)))
+        RefreshTokenService().revoke_all_for_user(session, user.id)
+        return updated

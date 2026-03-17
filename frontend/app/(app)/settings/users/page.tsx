@@ -120,6 +120,101 @@ function CreateUserModal({
   )
 }
 
+// ── Change password modal ──────────────────────────────────────────────────────
+
+function ChangePasswordModal({
+  user,
+  onClose,
+}: {
+  user: User
+  onClose: () => void
+}) {
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (newPassword.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.patch(`/auth/users/${user.public_id}/password`, { new_password: newPassword })
+      setSuccess(true)
+      setTimeout(onClose, 1500)
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cambiar la contraseña')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-sm rounded-lg border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <h3 className="font-semibold">Cambiar contraseña</h3>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3 px-5 py-4">
+          {success ? (
+            <p className="rounded-md bg-green-500/10 px-3 py-2 text-sm text-green-600">
+              Contraseña actualizada
+            </p>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Nueva contraseña</label>
+                <Input
+                  required
+                  type="password"
+                  placeholder="Mínimo 8 caracteres"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Confirmar contraseña</label>
+                <Input
+                  required
+                  type="password"
+                  placeholder="Repite la contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              {error && (
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={onClose}>
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" disabled={saving}>
+                  {saving ? 'Guardando…' : 'Guardar'}
+                </Button>
+              </div>
+            </>
+          )}
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── User detail panel ─────────────────────────────────────────────────────────
 
 function UserPanel({
@@ -137,6 +232,7 @@ function UserPanel({
   const [loadingRoles, setLoadingRoles] = useState(true)
   const [addingRoleId, setAddingRoleId] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showChangePwd, setShowChangePwd] = useState(false)
 
   // Edit form
   const [firstName, setFirstName] = useState(user.first_name)
@@ -180,6 +276,20 @@ function UserPanel({
     }
   }
 
+  async function handleToggleActive() {
+    setBusy(true)
+    try {
+      const updated = await api.patch<User>(`/auth/users/${user.public_id}`, {
+        is_active: !user.is_active,
+      })
+      onChanged(updated)
+    } catch {
+      // no-op
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleAddRole() {
     if (!addingRoleId) return
     setBusy(true)
@@ -205,6 +315,10 @@ function UserPanel({
   }
 
   return (
+    <>
+    {showChangePwd && (
+      <ChangePasswordModal user={user} onClose={() => setShowChangePwd(false)} />
+    )}
     <div className="flex w-80 shrink-0 flex-col border-l bg-card">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
@@ -263,7 +377,38 @@ function UserPanel({
           <Button type="submit" size="sm" className="w-full" disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar cambios'}
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowChangePwd(true)}
+          >
+            Cambiar contraseña
+          </Button>
         </form>
+
+        <hr />
+
+        {/* Active toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Estado
+            </p>
+            <p className={`mt-0.5 text-sm font-medium ${user.is_active ? 'text-green-600' : 'text-muted-foreground'}`}>
+              {user.is_active ? 'Activo' : 'Inactivo'}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={handleToggleActive}
+          >
+            {user.is_active ? 'Desactivar' : 'Activar'}
+          </Button>
+        </div>
 
         <hr />
 
@@ -319,6 +464,7 @@ function UserPanel({
         )}
       </div>
     </div>
+    </>
   )
 }
 
@@ -327,6 +473,7 @@ function UserPanel({
 export default function SettingsUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
+  const [userRolesMap, setUserRolesMap] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -340,6 +487,17 @@ export default function SettingsUsersPage() {
       ])
       setUsers(usersData)
       setAllRoles(rolesData)
+
+      // Batch-fetch roles for each user to populate the table column
+      const roleEntries = await Promise.all(
+        usersData.map((u) =>
+          api
+            .get<Role[]>(`/rbac/users/${u.public_id}/roles`)
+            .then((roles) => [u.public_id, roles.map((r) => r.name)] as const)
+            .catch(() => [u.public_id, []] as const),
+        ),
+      )
+      setUserRolesMap(Object.fromEntries(roleEntries))
     } finally {
       setLoading(false)
     }
@@ -392,20 +550,21 @@ export default function SettingsUsersPage() {
                   <th className="px-4 py-3 text-left font-medium">Nombre</th>
                   <th className="px-4 py-3 text-left font-medium">Email</th>
                   <th className="px-4 py-3 text-left font-medium">Cargo</th>
+                  <th className="px-4 py-3 text-left font-medium">Roles</th>
                   <th className="px-4 py-3 text-left font-medium">Activo</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                       Cargando…
                     </td>
                   </tr>
                 )}
                 {!loading && users.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                       No hay usuarios
                     </td>
                   </tr>
@@ -426,6 +585,22 @@ export default function SettingsUsersPage() {
                     <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {u.position ?? <span className="italic text-xs">Sin cargo</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(userRolesMap[u.public_id] ?? []).length === 0 ? (
+                        <span className="italic text-xs text-muted-foreground">Sin roles</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {(userRolesMap[u.public_id] ?? []).map((name) => (
+                            <span
+                              key={name}
+                              className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={u.is_active ? 'text-green-600' : 'text-muted-foreground'}>

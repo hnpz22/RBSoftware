@@ -228,12 +228,19 @@ export default function RolesPage() {
     }
   }
 
+  const PERM_CODE_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/
+
   async function handleCreatePermission(e: React.FormEvent) {
     e.preventDefault()
     setPermError(null)
+    const code = permCode.trim()
+    if (!PERM_CODE_RE.test(code)) {
+      setPermError('El código debe seguir el formato domain.resource.action (ej. commercial.sales_order.approve)')
+      return
+    }
     setSavingPerm(true)
     try {
-      await api.post('/rbac/permissions', { code: permCode.trim(), description: permDesc.trim() || null })
+      await api.post('/rbac/permissions', { code, description: permDesc.trim() || null })
       setPermCode('')
       setPermDesc('')
       setShowNewPerm(false)
@@ -245,11 +252,7 @@ export default function RolesPage() {
     }
   }
 
-  // Compute permission count per role (after panel changes)
-  const [rolePermCounts, setRolePermCounts] = useState<Record<string, number>>({})
-
   function handleRolePermChanged() {
-    // reload silently so counts stay fresh
     loadRoles()
   }
 
@@ -301,7 +304,12 @@ export default function RolesPage() {
         <Modal title="Nuevo permiso" onClose={() => { setShowNewPerm(false); setPermError(null) }}>
           <form onSubmit={handleCreatePermission} className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium">Código</label>
+              <label className="text-xs font-medium">
+                Código{' '}
+                <span className="font-normal text-muted-foreground normal-case">
+                  (formato: domain.resource.action)
+                </span>
+              </label>
               <Input
                 required
                 placeholder="ej. commercial.sales_order.approve"
@@ -378,19 +386,20 @@ export default function RolesPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium">Nombre</th>
                     <th className="px-4 py-3 text-left font-medium">Descripción</th>
+                    <th className="px-4 py-3 text-left font-medium w-28">Permisos</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && (
                     <tr>
-                      <td colSpan={2} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
                         Cargando…
                       </td>
                     </tr>
                   )}
                   {!loading && roles.length === 0 && (
                     <tr>
-                      <td colSpan={2} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
                         No hay roles
                       </td>
                     </tr>
@@ -406,6 +415,9 @@ export default function RolesPage() {
                       <td className="px-4 py-3 font-medium">{role.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {role.description ?? <span className="italic text-xs">Sin descripción</span>}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                        {role.permission_count}
                       </td>
                     </tr>
                   ))}

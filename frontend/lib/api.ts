@@ -2,7 +2,7 @@ import type { ApiError } from './types'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: 'include',
     headers: {
@@ -11,6 +11,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
     ...init,
   })
+
+  if (res.status === 401 && retry) {
+    const refreshRes = await fetch(`${BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+
+    if (refreshRes.ok) {
+      return request<T>(path, init, false)
+    }
+
+    window.location.href = '/login'
+    return new Promise<T>(() => {})
+  }
 
   if (!res.ok) {
     let detail = res.statusText
@@ -39,4 +53,6 @@ export const api = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** Raw fetch — use for binary responses (PDF, etc.). Caller must handle errors. */
+  getRaw: (path: string) => fetch(`${BASE}${path}`, { credentials: 'include' }),
 }

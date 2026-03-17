@@ -9,6 +9,7 @@ from app.domains.inventory.schemas.inventory import (
     BalanceSummaryItem,
     ManualAdjustmentCreate,
     MovementRead,
+    StockAlertItem,
 )
 from app.domains.inventory.schemas.location import LocationCreate, LocationRead, LocationUpdate
 
@@ -20,6 +21,7 @@ __all__ = [
     "BalanceSummaryItem",
     "ManualAdjustmentCreate",
     "MovementRead",
+    "StockAlertItem",
     "ComponentBalanceRead",
     "ComponentBalanceSummaryItem",
     "ComponentManualAdjustmentCreate",
