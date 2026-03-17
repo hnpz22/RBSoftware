@@ -13,6 +13,7 @@ from app.domains.inventory.routes import (
     inventory_locations_router,
     inventory_router,
 )
+from app.domains.academic.routes import academic_router
 from app.domains.rbac.routes import permissions_router, roles_router, user_roles_router
 
 api_router = APIRouter()
@@ -31,3 +32,4 @@ api_router.include_router(inventory_router)
 api_router.include_router(inventory_components_router)
 api_router.include_router(fulfillment_router)
 api_router.include_router(integrations_router)
+api_router.include_router(academic_router)

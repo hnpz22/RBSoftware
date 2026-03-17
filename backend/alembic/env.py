@@ -13,6 +13,7 @@ from app.domains.production import models as production_models  # noqa: F401
 from app.domains.inventory import models as inventory_models  # noqa: F401
 from app.domains.fulfillment import models as fulfillment_models  # noqa: F401
 from app.domains.integrations import models as integrations_models  # noqa: F401
+from app.domains.academic import models as academic_models  # noqa: F401
 from app.domains.rbac import models as rbac_models  # noqa: F401
 
 config = context.config

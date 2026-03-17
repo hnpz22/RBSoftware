@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
   Building2,
@@ -15,29 +15,29 @@ import {
   Shield,
   ShoppingCart,
   Users2,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/store";
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
 interface NavItem {
-  href: string
-  label: string
-  icon: React.ElementType
-  soon?: boolean
-  disabled?: boolean
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  soon?: boolean;
+  disabled?: boolean;
 }
 
 interface NavSection {
-  title: string
-  items: NavItem[]
+  title: string;
+  items: NavItem[];
 }
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: 'Operaciones',
+    title: "Operaciones",
     items: [
       { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
       { href: '/orders',      label: 'Órdenes',      icon: ShoppingCart },
@@ -48,40 +48,42 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Configuración',
+    title: "Configuración",
     items: [
       { href: '/settings/users', label: 'Usuarios',          icon: Users2 },
       { href: '/settings/roles', label: 'Roles y Permisos',  icon: Shield },
     ],
   },
   {
-    title: 'Próximamente',
+    title: "Próximamente",
     items: [
       { href: '#', label: 'Académico',      icon: GraduationCap, soon: true, disabled: true },
       { href: '#', label: 'Administrativo', icon: Building2,     soon: true, disabled: true },
       { href: '#', label: 'Integraciones',  icon: Plug,          soon: true, disabled: true },
     ],
   },
-]
+];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function Nav() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const { user, setUser } = useAuthStore()
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, setUser } = useAuthStore();
 
   async function handleLogout() {
-    await api.post('/auth/logout').catch(() => {})
-    setUser(null)
-    router.push('/login')
+    await api.post("/auth/logout").catch(() => {});
+    setUser(null);
+    router.push("/login");
   }
 
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r bg-card">
       {/* Logo */}
       <div className="flex h-14 items-center border-b px-4">
-        <span className="text-sm font-semibold tracking-wide">MIEL · RobotSchool</span>
+        <span className="text-sm font-semibold tracking-wide">
+          MIEL · RobotSchool
+        </span>
       </div>
 
       {/* Navigation */}
@@ -94,44 +96,47 @@ export function Nav() {
             </p>
 
             {/* Items */}
-            {section.items.map(({ href, label, icon: Icon, soon, disabled }) => {
-              const active =
-                !disabled &&
-                (pathname === href || (href !== '/' && pathname.startsWith(href + '/')))
+            {section.items.map(
+              ({ href, label, icon: Icon, soon, disabled }) => {
+                const active =
+                  !disabled &&
+                  (pathname === href ||
+                    (href !== "/" && pathname.startsWith(href + "/")));
 
-              if (disabled) {
+                if (disabled) {
+                  return (
+                    <div
+                      key={label}
+                      className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm opacity-40"
+                    >
+                      <Icon size={16} />
+                      <span>{label}</span>
+                      {soon && (
+                        <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          Soon
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
-                  <div
-                    key={label}
-                    className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm opacity-50"
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
                   >
                     <Icon size={16} />
                     <span>{label}</span>
-                    {soon && (
-                      <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        Soon
-                      </span>
-                    )}
-                  </div>
-                )
-              }
-
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                    active
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                >
-                  <Icon size={16} />
-                  <span>{label}</span>
-                </Link>
-              )
-            })}
+                  </Link>
+                );
+              },
+            )}
           </div>
         ))}
       </nav>
@@ -152,5 +157,5 @@ export function Nav() {
         </button>
       </div>
     </aside>
-  )
+  );
 }
