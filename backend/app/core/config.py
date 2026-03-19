@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     woo_consumer_key: str | None = None
     woo_consumer_secret: str | None = None
 
+    # MinIO / S3 storage
+    minio_endpoint: str = "minio:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "rbsoftware"
+    minio_use_ssl: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -7,13 +7,13 @@ from pydantic import ConfigDict
 from sqlmodel import SQLModel
 
 
-class LmsUnitCreate(SQLModel):
+class UnitCreate(SQLModel):
     title: str
     description: str | None = None
     order_index: int = 0
 
 
-class LmsUnitRead(SQLModel):
+class UnitRead(SQLModel):
     model_config = ConfigDict(from_attributes=True)
 
     public_id: UUID
@@ -25,7 +25,8 @@ class LmsUnitRead(SQLModel):
     updated_at: datetime
 
 
-class LmsUnitUpdate(SQLModel):
+class UnitUpdate(SQLModel):
     title: str | None = None
     description: str | None = None
     order_index: int | None = None
+    is_published: bool | None = None

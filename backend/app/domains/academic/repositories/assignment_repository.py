@@ -6,14 +6,14 @@ from sqlmodel import Session, select
 
 from app.domains.academic.models.lms_assignment import LmsAssignment
 from app.domains.academic.models.lms_unit import LmsUnit
-from app.domains.academic.schemas.lms_assignment import LmsAssignmentCreate, LmsAssignmentUpdate
+from app.domains.academic.schemas.lms_assignment import AssignmentCreate, AssignmentUpdate
 
 
 class AssignmentRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create(self, unit_id: int, payload: LmsAssignmentCreate) -> LmsAssignment:
+    def create(self, unit_id: int, payload: AssignmentCreate) -> LmsAssignment:
         assignment = LmsAssignment.model_validate(payload, update={"unit_id": unit_id})
         self.session.add(assignment)
         self.session.commit()
@@ -33,7 +33,7 @@ class AssignmentRepository:
         stmt = select(LmsAssignment).where(LmsAssignment.unit_id == unit_id)
         if published_only:
             stmt = stmt.where(LmsAssignment.is_published.is_(True))
-        stmt = stmt.order_by(LmsAssignment.order_index)
+        stmt = stmt.order_by(LmsAssignment.title)
         return list(self.session.exec(stmt).all())
 
     def list_by_course(self, course_id: int) -> list[LmsAssignment]:
@@ -41,12 +41,12 @@ class AssignmentRepository:
             select(LmsAssignment)
             .join(LmsUnit, LmsUnit.id == LmsAssignment.unit_id)
             .where(LmsUnit.course_id == course_id)
-            .order_by(LmsUnit.order_index, LmsAssignment.order_index)
+            .order_by(LmsUnit.order_index, LmsAssignment.title)
         )
         return list(self.session.exec(stmt).all())
 
     def update(
-        self, assignment: LmsAssignment, payload: LmsAssignmentUpdate
+        self, assignment: LmsAssignment, payload: AssignmentUpdate
     ) -> LmsAssignment:
         updates = payload.model_dump(exclude_unset=True)
         for field_name, value in updates.items():

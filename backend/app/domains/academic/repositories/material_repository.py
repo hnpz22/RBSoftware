@@ -5,14 +5,14 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from app.domains.academic.models.lms_material import LmsMaterial
-from app.domains.academic.schemas.lms_material import LmsMaterialCreate, LmsMaterialUpdate
+from app.domains.academic.schemas.lms_material import MaterialCreate, MaterialUpdate
 
 
 class MaterialRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create(self, unit_id: int, payload: LmsMaterialCreate) -> LmsMaterial:
+    def create(self, unit_id: int, payload: MaterialCreate) -> LmsMaterial:
         material = LmsMaterial.model_validate(payload, update={"unit_id": unit_id})
         self.session.add(material)
         self.session.commit()
@@ -35,7 +35,7 @@ class MaterialRepository:
         stmt = stmt.order_by(LmsMaterial.order_index)
         return list(self.session.exec(stmt).all())
 
-    def update(self, material: LmsMaterial, payload: LmsMaterialUpdate) -> LmsMaterial:
+    def update(self, material: LmsMaterial, payload: MaterialUpdate) -> LmsMaterial:
         updates = payload.model_dump(exclude_unset=True)
         for field_name, value in updates.items():
             setattr(material, field_name, value)

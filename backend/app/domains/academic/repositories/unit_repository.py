@@ -5,14 +5,14 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from app.domains.academic.models.lms_unit import LmsUnit
-from app.domains.academic.schemas.lms_unit import LmsUnitCreate, LmsUnitUpdate
+from app.domains.academic.schemas.lms_unit import UnitCreate, UnitUpdate
 
 
 class UnitRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create(self, course_id: int, payload: LmsUnitCreate) -> LmsUnit:
+    def create(self, course_id: int, payload: UnitCreate) -> LmsUnit:
         unit = LmsUnit.model_validate(payload, update={"course_id": course_id})
         self.session.add(unit)
         self.session.commit()
@@ -42,7 +42,7 @@ class UnitRepository:
         self.session.refresh(unit)
         return unit
 
-    def update(self, unit: LmsUnit, payload: LmsUnitUpdate) -> LmsUnit:
+    def update(self, unit: LmsUnit, payload: UnitUpdate) -> LmsUnit:
         updates = payload.model_dump(exclude_unset=True)
         for field_name, value in updates.items():
             setattr(unit, field_name, value)

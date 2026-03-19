@@ -15,12 +15,17 @@ class School(SQLModel, table=True):
         sa_column=Column(Uuid(as_uuid=True, native_uuid=False), nullable=False, unique=True),
     )
     name: str = Field(sa_column=Column(String(255), nullable=False))
-    code: str = Field(sa_column=Column(String(50), nullable=False, unique=True))
-    address: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     city: str | None = Field(default=None, sa_column=Column(String(100), nullable=True))
-    phone: str | None = Field(default=None, sa_column=Column(String(30), nullable=True))
-    contact_name: str | None = Field(default=None, sa_column=Column(String(200), nullable=True))
-    contact_email: str | None = Field(default=None, sa_column=Column(String(255), nullable=True))
+    address: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    contact_name: str | None = Field(
+        default=None, sa_column=Column(String(100), nullable=True)
+    )
+    contact_email: str | None = Field(
+        default=None, sa_column=Column(String(255), nullable=True)
+    )
+    contact_phone: str | None = Field(
+        default=None, sa_column=Column(String(30), nullable=True)
+    )
     is_active: bool = Field(default=True, nullable=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

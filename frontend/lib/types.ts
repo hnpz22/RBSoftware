@@ -210,3 +210,135 @@ export interface ApiError {
   status: number
   detail: string
 }
+
+// ── Academic ─────────────────────────────────────────────────────────────────
+
+export interface School {
+  public_id: string
+  name: string
+  city: string | null
+  address: string | null
+  contact_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Grade {
+  public_id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface GradeWithCourses extends Grade {
+  courses: CourseRead[]
+  director: User | null
+}
+
+export interface CourseRead {
+  public_id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CourseDetail {
+  public_id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  teacher: User
+  students: User[]
+  units: UnitRead[]
+}
+
+export interface UnitRead {
+  public_id: string
+  title: string
+  description: string | null
+  order_index: number
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MaterialRead {
+  public_id: string
+  title: string
+  type: string
+  content: string | null
+  file_key: string | null
+  order_index: number
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AssignmentRead {
+  public_id: string
+  title: string
+  description: string | null
+  due_date: string | null
+  max_score: number
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SubmissionWithStudent {
+  public_id: string
+  content: string | null
+  file_key: string | null
+  file_name: string | null
+  status: string
+  score: number | null
+  feedback: string | null
+  submitted_at: string | null
+  graded_at: string | null
+  created_at: string
+  updated_at: string
+  student: User
+}
+
+export interface MySubmission {
+  public_id: string
+  content: string | null
+  file_key: string | null
+  file_name: string | null
+  status: string
+  score: number | null
+  feedback: string | null
+  submitted_at: string | null
+  graded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface StudentAssignment {
+  public_id: string
+  title: string
+  description: string | null
+  due_date: string | null
+  max_score: number
+  is_published: boolean
+  my_submission: MySubmission | null
+}
+
+export interface StudentUnitContent {
+  public_id: string
+  title: string
+  description: string | null
+  order_index: number
+  is_published: boolean
+  materials: MaterialRead[]
+  assignments: StudentAssignment[]
+}

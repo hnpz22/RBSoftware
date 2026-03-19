@@ -19,6 +19,10 @@ class LmsGradeDirector(SQLModel, table=True):
     user_id: int = Field(
         sa_column=Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     )
+    assigned_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
     is_active: bool = Field(default=True, nullable=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

@@ -1,49 +1,41 @@
 """ACADEMIC domain schemas."""
 
 from app.domains.academic.schemas.composite import (
-    AssignmentSubmissionRead,
     AssignmentWithSubmissions,
     CourseDetail,
-    CourseStudentRead,
-    CourseTeacherRead,
-    GradeDirectorRead,
     GradeWithCourses,
-    StudentAssignmentProgress,
-    StudentAssignmentWithMySubmission,
-    StudentCourseContentUnit,
-    StudentProgress,
-    SubmissionStudentRead,
+    StudentCourseProgress,
+    SubmissionWithStudent,
     UnitWithContent,
 )
 from app.domains.academic.schemas.lms_assignment import (
-    LmsAssignmentCreate,
-    LmsAssignmentRead,
-    LmsAssignmentUpdate,
+    AssignmentCreate,
+    AssignmentRead,
+    AssignmentUpdate,
 )
 from app.domains.academic.schemas.lms_course import (
-    LmsCourseCreate,
-    LmsCourseRead,
-    LmsCourseUpdate,
-)
-from app.domains.academic.schemas.lms_material import (
-    LmsMaterialCreate,
-    LmsMaterialRead,
-    LmsMaterialUpdate,
-)
-from app.domains.academic.schemas.lms_submission import (
-    LmsSubmissionCreate,
-    LmsSubmissionRead,
-    LmsSubmissionUpdate,
-)
-from app.domains.academic.schemas.lms_unit import (
-    LmsUnitCreate,
-    LmsUnitRead,
-    LmsUnitUpdate,
+    CourseCreate,
+    CourseRead,
+    CourseUpdate,
 )
 from app.domains.academic.schemas.lms_grade import (
-    LmsGradeCreate,
-    LmsGradeRead,
-    LmsGradeUpdate,
+    GradeCreate,
+    GradeRead,
+    GradeUpdate,
+)
+from app.domains.academic.schemas.lms_material import (
+    MaterialCreate,
+    MaterialRead,
+    MaterialUpdate,
+)
+from app.domains.academic.schemas.lms_submission import (
+    SubmissionRead,
+    SubmissionUpdate,
+)
+from app.domains.academic.schemas.lms_unit import (
+    UnitCreate,
+    UnitRead,
+    UnitUpdate,
 )
 from app.domains.academic.schemas.school import (
     SchoolCreate,
@@ -55,35 +47,27 @@ __all__ = [
     "SchoolCreate",
     "SchoolRead",
     "SchoolUpdate",
-    "LmsGradeCreate",
-    "LmsGradeRead",
-    "LmsGradeUpdate",
-    "LmsCourseCreate",
-    "LmsCourseRead",
-    "LmsCourseUpdate",
-    "LmsUnitCreate",
-    "LmsUnitRead",
-    "LmsUnitUpdate",
-    "LmsMaterialCreate",
-    "LmsMaterialRead",
-    "LmsMaterialUpdate",
-    "LmsAssignmentCreate",
-    "LmsAssignmentRead",
-    "LmsAssignmentUpdate",
-    "LmsSubmissionCreate",
-    "LmsSubmissionRead",
-    "LmsSubmissionUpdate",
-    "GradeDirectorRead",
+    "GradeCreate",
+    "GradeRead",
+    "GradeUpdate",
+    "CourseCreate",
+    "CourseRead",
+    "CourseUpdate",
+    "UnitCreate",
+    "UnitRead",
+    "UnitUpdate",
+    "MaterialCreate",
+    "MaterialRead",
+    "MaterialUpdate",
+    "AssignmentCreate",
+    "AssignmentRead",
+    "AssignmentUpdate",
+    "SubmissionRead",
+    "SubmissionUpdate",
     "GradeWithCourses",
-    "CourseTeacherRead",
-    "CourseStudentRead",
     "CourseDetail",
     "UnitWithContent",
-    "SubmissionStudentRead",
-    "AssignmentSubmissionRead",
+    "SubmissionWithStudent",
     "AssignmentWithSubmissions",
-    "StudentAssignmentProgress",
-    "StudentProgress",
-    "StudentAssignmentWithMySubmission",
-    "StudentCourseContentUnit",
+    "StudentCourseProgress",
 ]

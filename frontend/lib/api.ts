@@ -22,8 +22,13 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
       return request<T>(path, init, false)
     }
 
-    window.location.href = '/login'
-    return new Promise<T>(() => {})
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login'
+      return new Promise<T>(() => {})
+    }
+
+    const err: ApiError = { status: 401, detail: 'Unauthorized' }
+    throw err
   }
 
   if (!res.ok) {

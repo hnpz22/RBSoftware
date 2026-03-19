@@ -96,6 +96,163 @@ def seed_roles(session: Session) -> None:
         print(f"  [ok]   rol '{role_data.name}' creado")
 
 
+# ── Académico ────────────────────────────────────────────────────────────────
+
+
+def seed_academic(session: Session) -> None:
+    from app.domains.academic.models.school import School
+    from app.domains.academic.models.lms_grade import LmsGrade
+    from app.domains.academic.models.lms_course import LmsCourse
+    from app.domains.academic.models.lms_unit import LmsUnit
+    from app.domains.academic.models.lms_material import LmsMaterial
+    from app.domains.academic.models.lms_assignment import LmsAssignment
+    from app.domains.academic.repositories import (
+        SchoolRepository, GradeRepository, CourseRepository,
+        CourseStudentRepository, GradeDirectorRepository,
+        UnitRepository, MaterialRepository, AssignmentRepository,
+    )
+    from app.domains.academic.schemas import (
+        SchoolCreate, GradeCreate, CourseCreate,
+        UnitCreate, MaterialCreate, AssignmentCreate,
+    )
+
+    svc = UserService()
+
+    # — Colegio —
+    school = session.exec(select(School).where(School.name == "Colegio San Pedro")).first()
+    if school:
+        print("  [skip] colegio 'Colegio San Pedro' ya existe")
+    else:
+        school = SchoolRepository(session).create(
+            SchoolCreate(name="Colegio San Pedro", city="Bogotá")
+        )
+        print("  [ok]   colegio 'Colegio San Pedro' creado")
+
+    # — Grado —
+    grade = session.exec(
+        select(LmsGrade).where(LmsGrade.name == "4to Primaria", LmsGrade.school_id == school.id)
+    ).first()
+    if grade:
+        print("  [skip] grado '4to Primaria' ya existe")
+    else:
+        grade = GradeRepository(session).create(school.id, GradeCreate(name="4to Primaria"))
+        print("  [ok]   grado '4to Primaria' creado")
+
+    # — Usuarios académicos —
+    academic_users = [
+        dict(email="director4@sanpedro.edu.co", password="Director1234!",
+             first_name="Carlos", last_name="Ruiz", position="Director de Grado"),
+        dict(email="docente1@sanpedro.edu.co", password="Docente1234!",
+             first_name="María", last_name="García", position="Docente"),
+        dict(email="estudiante1@sanpedro.edu.co", password="Estudiante1234!",
+             first_name="Juan", last_name="Pérez"),
+        dict(email="estudiante2@sanpedro.edu.co", password="Estudiante1234!",
+             first_name="Ana", last_name="López"),
+    ]
+    users: dict[str, User] = {}
+    for u in academic_users:
+        existing = session.exec(select(User).where(User.email == u["email"])).first()
+        if existing:
+            print(f"  [skip] usuario '{u['email']}' ya existe")
+            users[u["email"]] = existing
+        else:
+            users[u["email"]] = svc.register(session, **u)
+            print(f"  [ok]   usuario '{u['email']}' creado")
+
+    # — Director —
+    director = users["director4@sanpedro.edu.co"]
+    director_repo = GradeDirectorRepository(session)
+    if director_repo.is_director_of_grade(grade.id, director.id):
+        print("  [skip] director ya asignado a '4to Primaria'")
+    else:
+        director_repo.assign(grade.id, director.id)
+        print("  [ok]   director asignado a '4to Primaria'")
+
+    # — Curso —
+    teacher = users["docente1@sanpedro.edu.co"]
+    course = session.exec(
+        select(LmsCourse).where(LmsCourse.name == "4to A", LmsCourse.grade_id == grade.id)
+    ).first()
+    if course:
+        print("  [skip] curso '4to A' ya existe")
+    else:
+        course = CourseRepository(session).create(
+            grade.id, school.id, teacher.id, CourseCreate(name="4to A")
+        )
+        print("  [ok]   curso '4to A' creado")
+
+    # — Estudiantes enrolled —
+    cs_repo = CourseStudentRepository(session)
+    for email in ["estudiante1@sanpedro.edu.co", "estudiante2@sanpedro.edu.co"]:
+        student = users[email]
+        if cs_repo.is_enrolled(course.id, student.id):
+            print(f"  [skip] '{email}' ya enrolled en '4to A'")
+        else:
+            cs_repo.enroll(course.id, student.id)
+            print(f"  [ok]   '{email}' enrolled en '4to A'")
+
+    # — Unidad —
+    unit = session.exec(
+        select(LmsUnit).where(
+            LmsUnit.title == "Introducción a la Robótica", LmsUnit.course_id == course.id
+        )
+    ).first()
+    if unit:
+        print("  [skip] unidad 'Introducción a la Robótica' ya existe")
+    else:
+        unit = UnitRepository(session).create(
+            course.id,
+            UnitCreate(title="Introducción a la Robótica", order_index=0),
+        )
+        unit.is_published = True
+        session.add(unit)
+        session.commit()
+        session.refresh(unit)
+        print("  [ok]   unidad 'Introducción a la Robótica' creada")
+
+    # — Material —
+    mat = session.exec(
+        select(LmsMaterial).where(
+            LmsMaterial.title == "Bienvenidos al curso", LmsMaterial.unit_id == unit.id
+        )
+    ).first()
+    if mat:
+        print("  [skip] material 'Bienvenidos al curso' ya existe")
+    else:
+        MaterialRepository(session).create(
+            unit.id,
+            MaterialCreate(
+                title="Bienvenidos al curso",
+                type="TEXT",
+                content="En este curso aprenderán los fundamentos de la robótica.",
+                is_published=True,
+            ),
+        )
+        print("  [ok]   material 'Bienvenidos al curso' creado")
+
+    # — Assignment —
+    assign = session.exec(
+        select(LmsAssignment).where(
+            LmsAssignment.title == "Dibuja tu robot ideal", LmsAssignment.unit_id == unit.id
+        )
+    ).first()
+    if assign:
+        print("  [skip] assignment 'Dibuja tu robot ideal' ya existe")
+    else:
+        a = AssignmentRepository(session).create(
+            unit.id,
+            AssignmentCreate(
+                title="Dibuja tu robot ideal",
+                description="Dibuja y describe cómo sería tu robot ideal.",
+                max_score=100,
+            ),
+        )
+        a.is_published = True
+        session.add(a)
+        session.commit()
+        print("  [ok]   assignment 'Dibuja tu robot ideal' creado")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -109,6 +266,9 @@ def main() -> None:
 
         print("\n→ Roles RBAC:")
         seed_roles(session)
+
+        print("\n→ Académico:")
+        seed_academic(session)
 
     print("\n✓ Seed completo.")
 

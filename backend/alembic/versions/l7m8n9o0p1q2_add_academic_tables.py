@@ -1,4 +1,4 @@
-"""add_academic_tables
+"""add_academic_domain
 
 Revision ID: l7m8n9o0p1q2
 Revises: k6l7m8n9o0p1
@@ -23,12 +23,11 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('public_id', sa.Uuid(as_uuid=True, native_uuid=False), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
-        sa.Column('code', sa.String(length=50), nullable=False),
-        sa.Column('address', sa.Text(), nullable=True),
         sa.Column('city', sa.String(length=100), nullable=True),
-        sa.Column('phone', sa.String(length=30), nullable=True),
-        sa.Column('contact_name', sa.String(length=200), nullable=True),
+        sa.Column('address', sa.Text(), nullable=True),
+        sa.Column('contact_name', sa.String(length=100), nullable=True),
         sa.Column('contact_email', sa.String(length=255), nullable=True),
+        sa.Column('contact_phone', sa.String(length=30), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column(
             'created_at',
@@ -44,7 +43,6 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('public_id'),
-        sa.UniqueConstraint('code'),
     )
 
     # 2. lms_grades (FK → schools)
@@ -54,8 +52,7 @@ def upgrade() -> None:
         sa.Column('public_id', sa.Uuid(as_uuid=True, native_uuid=False), nullable=False),
         sa.Column('school_id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(length=100), nullable=False),
-        sa.Column('label', sa.String(length=100), nullable=True),
-        sa.Column('order_index', sa.Integer(), nullable=False, server_default=sa.text('0')),
+        sa.Column('description', sa.Text(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column(
             'created_at',
@@ -73,7 +70,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('public_id'),
     )
-    op.create_index('ix_lms_grades_school_id', 'lms_grades', ['school_id'], unique=False)
+    op.create_index('ix_lms_grades_school_id', 'lms_grades', ['school_id'])
 
     # 3. lms_grade_directors (FK → lms_grades, users)
     op.create_table(
@@ -81,6 +78,7 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('grade_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('assigned_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column(
             'created_at',
@@ -109,10 +107,9 @@ def upgrade() -> None:
         sa.Column('public_id', sa.Uuid(as_uuid=True, native_uuid=False), nullable=False),
         sa.Column('grade_id', sa.Integer(), nullable=False),
         sa.Column('school_id', sa.Integer(), nullable=False),
-        sa.Column('teacher_id', sa.Integer(), nullable=True),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('year', sa.Integer(), nullable=False),
+        sa.Column('teacher_id', sa.Integer(), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column(
             'created_at',
@@ -128,7 +125,7 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(['grade_id'], ['lms_grades.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['teacher_id'], ['users.id'], ondelete='SET NULL'),
+        sa.ForeignKeyConstraint(['teacher_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('public_id'),
     )
@@ -142,14 +139,13 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('course_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('transferred_from_course_id', sa.Integer(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column(
             'enrolled_at',
             sa.DateTime(timezone=True),
-            server_default=sa.text('now()'),
             nullable=False,
         ),
+        sa.Column('transferred_from_course_id', sa.Integer(), nullable=True),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column(
             'created_at',
             sa.DateTime(timezone=True),
@@ -208,10 +204,9 @@ def upgrade() -> None:
         sa.Column('public_id', sa.Uuid(as_uuid=True, native_uuid=False), nullable=False),
         sa.Column('unit_id', sa.Integer(), nullable=False),
         sa.Column('title', sa.String(length=255), nullable=False),
-        sa.Column('type', sa.String(length=50), nullable=False),
+        sa.Column('type', sa.String(length=20), nullable=False),
         sa.Column('content', sa.Text(), nullable=True),
         sa.Column('file_key', sa.String(length=500), nullable=True),
-        sa.Column('file_name', sa.String(length=255), nullable=True),
         sa.Column('order_index', sa.Integer(), nullable=False, server_default=sa.text('0')),
         sa.Column('is_published', sa.Boolean(), nullable=False, server_default=sa.text('0')),
         sa.Column(
@@ -240,9 +235,8 @@ def upgrade() -> None:
         sa.Column('unit_id', sa.Integer(), nullable=False),
         sa.Column('title', sa.String(length=255), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('max_score', sa.Numeric(precision=5, scale=2), nullable=False),
         sa.Column('due_date', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('order_index', sa.Integer(), nullable=False, server_default=sa.text('0')),
+        sa.Column('max_score', sa.Integer(), nullable=False, server_default=sa.text('100')),
         sa.Column('is_published', sa.Boolean(), nullable=False, server_default=sa.text('0')),
         sa.Column(
             'created_at',
@@ -272,16 +266,17 @@ def upgrade() -> None:
         sa.Column('content', sa.Text(), nullable=True),
         sa.Column('file_key', sa.String(length=500), nullable=True),
         sa.Column('file_name', sa.String(length=255), nullable=True),
-        sa.Column('status', sa.String(length=20), nullable=False, server_default=sa.text("'DRAFT'")),
-        sa.Column('score', sa.Numeric(precision=5, scale=2), nullable=True),
+        sa.Column('score', sa.Integer(), nullable=True),
         sa.Column('feedback', sa.Text(), nullable=True),
-        sa.Column('graded_by', sa.Integer(), nullable=True),
-        sa.Column('graded_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column(
-            'submitted_at',
-            sa.DateTime(timezone=True),
-            nullable=True,
+            'status',
+            sa.String(length=20),
+            nullable=False,
+            server_default=sa.text("'PENDING'"),
         ),
+        sa.Column('submitted_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('graded_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('graded_by', sa.Integer(), nullable=True),
         sa.Column(
             'created_at',
             sa.DateTime(timezone=True),
@@ -309,34 +304,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index('ix_lms_submissions_status', table_name='lms_submissions')
-    op.drop_index('ix_lms_submissions_student_id', table_name='lms_submissions')
-    op.drop_index('ix_lms_submissions_assignment_id', table_name='lms_submissions')
+    # Drop tables in reverse order — DROP TABLE handles indexes/FKs in MySQL
     op.drop_table('lms_submissions')
-
-    op.drop_index('ix_lms_assignments_unit_id', table_name='lms_assignments')
     op.drop_table('lms_assignments')
-
-    op.drop_index('ix_lms_materials_unit_id', table_name='lms_materials')
     op.drop_table('lms_materials')
-
-    op.drop_index('ix_lms_units_course_id', table_name='lms_units')
     op.drop_table('lms_units')
-
-    op.drop_index('ix_lms_course_students_user_id', table_name='lms_course_students')
-    op.drop_index('ix_lms_course_students_course_id', table_name='lms_course_students')
     op.drop_table('lms_course_students')
-
-    op.drop_index('ix_lms_courses_teacher_id', table_name='lms_courses')
-    op.drop_index('ix_lms_courses_school_id', table_name='lms_courses')
-    op.drop_index('ix_lms_courses_grade_id', table_name='lms_courses')
     op.drop_table('lms_courses')
-
-    op.drop_index('ix_lms_grade_directors_user_id', table_name='lms_grade_directors')
-    op.drop_index('ix_lms_grade_directors_grade_id', table_name='lms_grade_directors')
     op.drop_table('lms_grade_directors')
-
-    op.drop_index('ix_lms_grades_school_id', table_name='lms_grades')
     op.drop_table('lms_grades')
-
     op.drop_table('schools')

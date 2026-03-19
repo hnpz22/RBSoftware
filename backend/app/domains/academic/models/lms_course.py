@@ -24,15 +24,13 @@ class LmsCourse(SQLModel, table=True):
             Integer, ForeignKey("schools.id", ondelete="CASCADE"), nullable=False
         )
     )
-    teacher_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-        ),
-    )
     name: str = Field(sa_column=Column(String(255), nullable=False))
     description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
-    year: int = Field(nullable=False)
+    teacher_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        )
+    )
     is_active: bool = Field(default=True, nullable=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

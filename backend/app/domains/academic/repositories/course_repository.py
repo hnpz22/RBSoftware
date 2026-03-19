@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from app.domains.academic.models.lms_course import LmsCourse
 from app.domains.academic.models.lms_course_student import LmsCourseStudent
-from app.domains.academic.schemas.lms_course import LmsCourseCreate, LmsCourseUpdate
+from app.domains.academic.schemas.lms_course import CourseCreate, CourseUpdate
 from app.domains.auth.models import User
 
 
@@ -19,7 +19,7 @@ class CourseRepository:
         grade_id: int,
         school_id: int,
         teacher_id: int | None,
-        payload: LmsCourseCreate,
+        payload: CourseCreate,
     ) -> LmsCourse:
         course = LmsCourse.model_validate(
             payload,
@@ -81,7 +81,7 @@ class CourseRepository:
         students = list(self.session.exec(stmt).all())
         return course, students
 
-    def update(self, course: LmsCourse, payload: LmsCourseUpdate) -> LmsCourse:
+    def update(self, course: LmsCourse, payload: CourseUpdate) -> LmsCourse:
         updates = payload.model_dump(exclude_unset=True)
         for field_name, value in updates.items():
             setattr(course, field_name, value)

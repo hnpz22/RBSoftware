@@ -10,6 +10,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const setHydrated = useAuthStore((s) => s.setHydrated)
 
   useEffect(() => {
+    if (window.location.pathname === '/login') {
+      setHydrated()
+      return
+    }
     api
       .get<User>('/auth/me')
       .then((user) => setUser(user))

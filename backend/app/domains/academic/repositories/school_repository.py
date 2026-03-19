@@ -26,10 +26,6 @@ class SchoolRepository:
         stmt = select(School).where(School.public_id == public_id)
         return self.session.exec(stmt).first()
 
-    def get_by_code(self, code: str) -> School | None:
-        stmt = select(School).where(School.code == code)
-        return self.session.exec(stmt).first()
-
     def list(self, is_active: bool | None = None) -> list[School]:
         stmt = select(School)
         if is_active is not None:

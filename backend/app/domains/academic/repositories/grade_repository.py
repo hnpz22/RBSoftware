@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from app.domains.academic.models.lms_course import LmsCourse
 from app.domains.academic.models.lms_grade import LmsGrade
 from app.domains.academic.models.lms_grade_director import LmsGradeDirector
-from app.domains.academic.schemas.lms_grade import LmsGradeCreate, LmsGradeUpdate
+from app.domains.academic.schemas.lms_grade import GradeCreate, GradeUpdate
 from app.domains.auth.models import User
 
 
@@ -15,7 +15,7 @@ class GradeRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create(self, school_id: int, payload: LmsGradeCreate) -> LmsGrade:
+    def create(self, school_id: int, payload: GradeCreate) -> LmsGrade:
         grade = LmsGrade.model_validate(payload, update={"school_id": school_id})
         self.session.add(grade)
         self.session.commit()
@@ -33,7 +33,7 @@ class GradeRepository:
         stmt = (
             select(LmsGrade)
             .where(LmsGrade.school_id == school_id)
-            .order_by(LmsGrade.order_index)
+            .order_by(LmsGrade.name)
         )
         return list(self.session.exec(stmt).all())
 
@@ -63,7 +63,7 @@ class GradeRepository:
 
         return grade, courses, director
 
-    def update(self, grade: LmsGrade, payload: LmsGradeUpdate) -> LmsGrade:
+    def update(self, grade: LmsGrade, payload: GradeUpdate) -> LmsGrade:
         updates = payload.model_dump(exclude_unset=True)
         for field_name, value in updates.items():
             setattr(grade, field_name, value)

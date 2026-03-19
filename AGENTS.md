@@ -53,6 +53,7 @@ backend/app/
     production/
     fulfillment/
     integrations/
+    academic/
 ```
 
 Cada dominio tiene exactamente estas capas:
@@ -80,6 +81,7 @@ Cada dominio tiene exactamente estas capas:
 | production | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
 | fulfillment | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
 | integrations | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
+| academic | modelos ✅ schemas ✅ repos ✅ servicios ✅ rutas ✅ |
 | frontend | páginas funcionales conectadas al backend |
 
 Endpoints de auth:
@@ -262,13 +264,13 @@ Ver `db.sql` para el modelo de datos completo y actualizado.
 
 ---
 
-## Próximos dominios en desarrollo
+## Dominios implementados — notas
 
-### academic (en diseño)
+### academic (implementado)
 Dominio LMS para colegios. Jerarquía:
 Colegio → Grado (Director) → Curso (Teacher) → Estudiante
 
-Tablas planificadas: schools, lms_grades, lms_grade_directors,
+Tablas: schools, lms_grades, lms_grade_directors,
 lms_courses, lms_course_students, lms_units, lms_materials,
 lms_assignments, lms_submissions
 
@@ -283,6 +285,16 @@ Storage: MinIO para PDFs y archivos de entregas
 Keys: academic/{course_id}/materials/{uuid}.pdf
       academic/{course_id}/submissions/{assignment_id}/
       {student_id}/{uuid}.{ext}
+
+Endpoints: /academic/schools, /academic/grades, /academic/courses,
+/academic/units, /academic/materials, /academic/assignments,
+/academic/submissions, /academic/students
+
+Frontend: /academic/schools, /academic/schools/[id],
+/academic/grades, /academic/grades/[id],
+/academic/courses, /academic/courses/[id]
+Vista docente (2 paneles: unidades + contenido) y vista estudiante
+(unidades expandibles con materiales + tareas + entregas)
 
 ## Deuda técnica conocida
 - POST /auth/users no valida complejidad de contraseña en backend

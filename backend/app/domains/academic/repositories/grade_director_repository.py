@@ -35,7 +35,7 @@ class GradeDirectorRepository:
         self.session.commit()
         return True
 
-    def get_director(self, grade_id: int) -> User | None:
+    def get_active_director(self, grade_id: int) -> User | None:
         stmt = (
             select(User)
             .join(LmsGradeDirector, LmsGradeDirector.user_id == User.id)
@@ -54,15 +54,15 @@ class GradeDirectorRepository:
                 LmsGradeDirector.user_id == user_id,
                 LmsGradeDirector.is_active.is_(True),
             )
-            .order_by(LmsGrade.order_index)
+            .order_by(LmsGrade.name)
         )
         return list(self.session.exec(stmt).all())
 
-    def is_director(self, grade_id: int, user_id: int) -> bool:
+    def is_director_of_grade(self, grade_id: int, user_id: int) -> bool:
         record = self._get_record(grade_id, user_id)
         return record is not None and record.is_active
 
-    def is_director_of_any_grade_in_school(self, school_id: int, user_id: int) -> bool:
+    def is_director_in_school(self, school_id: int, user_id: int) -> bool:
         stmt = (
             select(LmsGradeDirector)
             .join(LmsGrade, LmsGrade.id == LmsGradeDirector.grade_id)

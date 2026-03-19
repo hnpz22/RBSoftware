@@ -7,6 +7,7 @@ import {
   Building2,
   Factory,
   GraduationCap,
+  Layers,
   LayoutDashboard,
   LogOut,
   Package,
@@ -48,6 +49,14 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Académico",
+    items: [
+      { href: '/academic/schools', label: 'Colegios',   icon: Building2 },
+      { href: '/academic/grades',  label: 'Mis Grados', icon: Layers },
+      { href: '/academic/courses', label: 'Mis Cursos', icon: BookOpen },
+    ],
+  },
+  {
     title: "Configuración",
     items: [
       { href: '/settings/users', label: 'Usuarios',          icon: Users2 },
@@ -57,8 +66,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Próximamente",
     items: [
-      { href: '#', label: 'Académico',      icon: GraduationCap, soon: true, disabled: true },
-      { href: '#', label: 'Administrativo', icon: Building2,     soon: true, disabled: true },
+      { href: '#', label: 'Administrativo', icon: GraduationCap, soon: true, disabled: true },
       { href: '#', label: 'Integraciones',  icon: Plug,          soon: true, disabled: true },
     ],
   },

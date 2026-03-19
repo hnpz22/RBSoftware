@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
-from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.types import Uuid
 from sqlmodel import Field, SQLModel
 
@@ -22,11 +21,10 @@ class LmsAssignment(SQLModel, table=True):
     )
     title: str = Field(sa_column=Column(String(255), nullable=False))
     description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
-    max_score: Decimal = Field(sa_column=Column(Numeric(5, 2), nullable=False))
     due_date: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    order_index: int = Field(default=0, nullable=False)
+    max_score: int = Field(default=100, nullable=False)
     is_published: bool = Field(default=False, nullable=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

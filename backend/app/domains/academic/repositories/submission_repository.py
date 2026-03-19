@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlmodel import Session, select
 
 from app.domains.academic.models.lms_assignment import LmsAssignment
 from app.domains.academic.models.lms_submission import LmsSubmission, SubmissionStatus
 from app.domains.academic.models.lms_unit import LmsUnit
-from app.domains.academic.schemas.lms_submission import LmsSubmissionCreate, LmsSubmissionUpdate
+from app.domains.academic.schemas.lms_submission import SubmissionUpdate
 from app.domains.auth.models import User
 
 
@@ -15,17 +16,10 @@ class SubmissionRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create(self, payload: LmsSubmissionCreate) -> LmsSubmission:
-        submission = LmsSubmission.model_validate(payload)
-        self.session.add(submission)
-        self.session.commit()
-        self.session.refresh(submission)
-        return submission
-
     def get_by_id(self, submission_id: int) -> LmsSubmission | None:
         return self.session.get(LmsSubmission, submission_id)
 
-    def get_by_public_id(self, public_id) -> LmsSubmission | None:
+    def get_by_public_id(self, public_id: UUID) -> LmsSubmission | None:
         stmt = select(LmsSubmission).where(LmsSubmission.public_id == public_id)
         return self.session.exec(stmt).first()
 
@@ -126,7 +120,7 @@ class SubmissionRepository:
         return {a.id: sub_map.get(a.id) for a in assignments}
 
     def update(
-        self, submission: LmsSubmission, payload: LmsSubmissionUpdate
+        self, submission: LmsSubmission, payload: SubmissionUpdate
     ) -> LmsSubmission:
         updates = payload.model_dump(exclude_unset=True)
         for field_name, value in updates.items():
