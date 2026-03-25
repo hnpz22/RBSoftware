@@ -9,7 +9,7 @@ from sqlmodel import Session
 from app.core.database import get_session
 from app.domains.academic.repositories import CourseRepository
 from app.domains.academic.services import AcademicService
-from app.domains.auth.dependencies import get_current_user
+from app.core.permissions import require_roles
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
 
@@ -30,7 +30,7 @@ def transfer_student(
     student_id: UUID,
     body: TransferBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     student = UserRepository(session).get_by_public_id(student_id)
     if student is None:

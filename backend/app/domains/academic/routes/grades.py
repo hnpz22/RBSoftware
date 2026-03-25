@@ -16,6 +16,7 @@ from app.domains.academic.schemas import (
     CourseCreate, CourseRead, GradeRead, GradeUpdate, GradeWithCourses,
 )
 from app.domains.academic.services import AcademicService
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
@@ -36,7 +37,7 @@ class CourseCreateBody(CourseCreate):
 @router.get("/my-grades", response_model=list[GradeRead])
 def my_grades(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("DIRECTOR")),
 ):
     return [
         GradeRead.model_validate(g)
@@ -48,7 +49,7 @@ def my_grades(
 def get_grade(
     grade_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
@@ -74,7 +75,7 @@ def update_grade(
     grade_id: UUID,
     data: GradeUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     repo = GradeRepository(session)
     grade = repo.get_by_public_id(grade_id)
@@ -88,7 +89,7 @@ def assign_director(
     grade_id: UUID,
     body: DirectorBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
@@ -108,7 +109,7 @@ def assign_director(
 def unassign_director(
     grade_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
@@ -124,7 +125,7 @@ def unassign_director(
 def list_courses(
     grade_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
@@ -144,7 +145,7 @@ def create_course(
     grade_id: UUID,
     body: CourseCreateBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:

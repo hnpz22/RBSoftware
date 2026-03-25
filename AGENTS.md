@@ -296,9 +296,47 @@ Frontend: /academic/schools, /academic/schools/[id],
 Vista docente (2 paneles: unidades + contenido) y vista estudiante
 (unidades expandibles con materiales + tareas + entregas)
 
+## Control de acceso — Módulo Académico
+
+Roles fijos del sistema:
+`ADMIN`, `DIRECTOR`, `TEACHER`, `STUDENT`, `OPERATIVO`, `COMERCIAL`
+
+Helper: `backend/app/core/permissions.py`
+- `require_roles(*roles)` → devuelve un `Depends()` de FastAPI
+- ADMIN siempre tiene acceso total (bypass implícito en el helper)
+
+Cookie `user_roles`: no httpOnly, seteada en login y refresh.
+Usada por `frontend/middleware.ts` para proteger rutas del frontend.
+Si el usuario no tiene el rol requerido → redirige a `/dashboard?error=unauthorized`.
+
+GET /auth/me retorna `roles: ["ADMIN", ...]` en el JSON.
+Store Zustand: `roles`, `hasRole(role)`, `isAdmin()`.
+
+Matriz de acceso académico:
+- ADMIN → acceso total a todos los endpoints y páginas
+- DIRECTOR → gestiona sus grados y cursos (`/academic/grades`, `/academic/courses`)
+- TEACHER → gestiona contenido de sus cursos (units, materials, assignments)
+- STUDENT → ve contenido publicado y entrega tareas (`/academic/courses`, submissions)
+
+Nav condicional (`frontend/components/nav.tsx`): cada rol ve solo las secciones
+que le corresponden. Si una sección no tiene ítems visibles, se oculta completa.
+
+Dashboard personalizado (`frontend/app/(app)/dashboard/page.tsx`): métricas
+diferentes según el rol del usuario (operativas, académicas, estudiantiles).
+
+Endpoints protegidos en `backend/app/domains/academic/routes/`:
+- `schools.py` → todos ADMIN
+- `grades.py` → DIRECTOR (my-grades), ADMIN+DIRECTOR (resto), ADMIN (director assign)
+- `courses.py` → get_current_user (lectura general), ADMIN+DIRECTOR (escritura), ADMIN+DIRECTOR+TEACHER (students list)
+- `units.py` → get_current_user (list), ADMIN+TEACHER (escritura)
+- `materials.py` → get_current_user (list/download), ADMIN+TEACHER (add/delete)
+- `assignments.py` → get_current_user (list), ADMIN+TEACHER (escritura/submissions)
+- `submissions.py` → STUDENT (submit/my-submission), ADMIN+TEACHER (grade)
+- `students.py` → ADMIN+DIRECTOR (transfer)
+
 ## Deuda técnica conocida
 - POST /auth/users no valida complejidad de contraseña en backend
 - change_password solo permite cambiar la propia contraseña —
   extender cuando exista guard de permisos admin
-- No existe require_permission() como dependency inyectable —
-  la autorización se hace manualmente en cada servicio
+- Dominios no académicos (commercial, inventory, production, fulfillment)
+  no tienen require_roles aplicado aún — solo usan get_current_user

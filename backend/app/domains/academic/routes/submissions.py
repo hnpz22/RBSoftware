@@ -10,6 +10,7 @@ from app.core.database import get_session
 from app.domains.academic.repositories import AssignmentRepository, SubmissionRepository
 from app.domains.academic.schemas import SubmissionRead
 from app.domains.academic.services import AcademicService
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 
@@ -31,7 +32,7 @@ async def submit_assignment(
     content: str | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("STUDENT")),
 ):
     assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
     if assignment is None:
@@ -69,7 +70,7 @@ async def submit_assignment(
 def get_my_submission(
     assignment_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("STUDENT")),
 ):
     assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
     if assignment is None:
@@ -90,7 +91,7 @@ def grade_submission(
     submission_id: UUID,
     body: GradeBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     submission = SubmissionRepository(session).get_by_public_id(submission_id)
     if submission is None:

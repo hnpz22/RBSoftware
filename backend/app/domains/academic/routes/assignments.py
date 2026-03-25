@@ -17,6 +17,7 @@ from app.domains.academic.schemas import (
     SubmissionWithStudent,
 )
 from app.domains.academic.services import AcademicService
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.schemas.user import UserRead
@@ -49,7 +50,7 @@ def create_assignment(
     unit_id: UUID,
     data: AssignmentCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     unit = UnitRepository(session).get_by_public_id(unit_id)
     if unit is None:
@@ -68,7 +69,7 @@ def update_assignment(
     assignment_id: UUID,
     data: AssignmentUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     repo = AssignmentRepository(session)
     assignment = repo.get_by_public_id(assignment_id)
@@ -88,7 +89,7 @@ def update_assignment(
 def publish_assignment(
     assignment_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
     if assignment is None:
@@ -108,7 +109,7 @@ def publish_assignment(
 def unpublish_assignment(
     assignment_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
     if assignment is None:
@@ -128,7 +129,7 @@ def unpublish_assignment(
 def get_submissions(
     assignment_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
     if assignment is None:

@@ -9,6 +9,7 @@ from app.core.database import get_session
 from app.domains.academic.repositories import CourseRepository, UnitRepository
 from app.domains.academic.schemas import UnitCreate, UnitRead, UnitUpdate
 from app.domains.academic.services import AcademicService
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 
@@ -40,7 +41,7 @@ def create_unit(
     course_id: UUID,
     data: UnitCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
@@ -57,7 +58,7 @@ def update_unit(
     unit_id: UUID,
     data: UnitUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     repo = UnitRepository(session)
     unit = repo.get_by_public_id(unit_id)
@@ -73,7 +74,7 @@ def update_unit(
 def publish_unit(
     unit_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     unit = UnitRepository(session).get_by_public_id(unit_id)
     if unit is None:
@@ -88,7 +89,7 @@ def publish_unit(
 def unpublish_unit(
     unit_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     unit = UnitRepository(session).get_by_public_id(unit_id)
     if unit is None:

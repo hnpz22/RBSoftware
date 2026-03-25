@@ -10,6 +10,7 @@ from app.core.storage import storage_service
 from app.domains.academic.repositories import MaterialRepository, UnitRepository
 from app.domains.academic.schemas import MaterialCreate, MaterialRead
 from app.domains.academic.services import AcademicService
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 
@@ -44,7 +45,7 @@ async def add_material(
     content: str | None = Form(default=None),
     file: UploadFile | None = File(default=None),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     unit = UnitRepository(session).get_by_public_id(unit_id)
     if unit is None:
@@ -70,7 +71,7 @@ async def add_material(
 def delete_material(
     material_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
     material = MaterialRepository(session).get_by_public_id(material_id)
     if material is None:

@@ -18,6 +18,7 @@ from app.domains.academic.schemas import (
     MaterialRead, SubmissionRead, UnitRead,
 )
 from app.domains.academic.services import AcademicService
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
@@ -105,7 +106,7 @@ def update_course(
     course_id: UUID,
     data: CourseUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     repo = CourseRepository(session)
     course = repo.get_by_public_id(course_id)
@@ -119,7 +120,7 @@ def assign_teacher(
     course_id: UUID,
     body: TeacherBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
@@ -139,7 +140,7 @@ def assign_teacher(
 def list_students(
     course_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "DIRECTOR", "TEACHER")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
@@ -158,7 +159,7 @@ def enroll_student(
     course_id: UUID,
     body: EnrollBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
@@ -182,7 +183,7 @@ def unenroll_student(
     course_id: UUID,
     user_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:

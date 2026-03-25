@@ -11,7 +11,7 @@ from app.domains.academic.schemas import (
     GradeCreate, GradeRead, SchoolCreate, SchoolRead, SchoolUpdate,
 )
 from app.domains.academic.services import AcademicService
-from app.domains.auth.dependencies import get_current_user
+from app.core.permissions import require_roles
 from app.domains.auth.models import User
 
 router = APIRouter(prefix="/academic", tags=["academic – schools"])
@@ -21,7 +21,7 @@ _svc = AcademicService()
 @router.get("/schools", response_model=list[SchoolRead])
 def list_schools(
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     return [SchoolRead.model_validate(s) for s in SchoolRepository(session).list()]
 
@@ -30,7 +30,7 @@ def list_schools(
 def create_school(
     data: SchoolCreate,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     return SchoolRead.model_validate(_svc.create_school(session, data))
 
@@ -39,7 +39,7 @@ def create_school(
 def get_school(
     school_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     school = SchoolRepository(session).get_by_public_id(school_id)
     if school is None:
@@ -52,7 +52,7 @@ def update_school(
     school_id: UUID,
     data: SchoolUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     repo = SchoolRepository(session)
     school = repo.get_by_public_id(school_id)
@@ -65,7 +65,7 @@ def update_school(
 def list_grades(
     school_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     school = SchoolRepository(session).get_by_public_id(school_id)
     if school is None:
@@ -85,7 +85,7 @@ def create_grade(
     school_id: UUID,
     data: GradeCreate,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     school = SchoolRepository(session).get_by_public_id(school_id)
     if school is None:

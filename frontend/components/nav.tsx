@@ -29,6 +29,7 @@ interface NavItem {
   icon: React.ElementType;
   soon?: boolean;
   disabled?: boolean;
+  visible?: () => boolean;
 }
 
 interface NavSection {
@@ -36,48 +37,55 @@ interface NavSection {
   items: NavItem[];
 }
 
-const NAV_SECTIONS: NavSection[] = [
-  {
-    title: "Operaciones",
-    items: [
-      { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
-      { href: '/orders',      label: 'Órdenes',      icon: ShoppingCart },
-      { href: '/catalog',     label: 'Catálogo',     icon: BookOpen },
-      { href: '/inventory',   label: 'Inventario',   icon: Package },
-      { href: '/production',  label: 'Producción',   icon: Factory },
-      { href: '/fulfillment', label: 'Fulfillment',  icon: PackageCheck },
-    ],
-  },
-  {
-    title: "Académico",
-    items: [
-      { href: '/academic/schools', label: 'Colegios',   icon: Building2 },
-      { href: '/academic/grades',  label: 'Mis Grados', icon: Layers },
-      { href: '/academic/courses', label: 'Mis Cursos', icon: BookOpen },
-    ],
-  },
-  {
-    title: "Configuración",
-    items: [
-      { href: '/settings/users', label: 'Usuarios',          icon: Users2 },
-      { href: '/settings/roles', label: 'Roles y Permisos',  icon: Shield },
-    ],
-  },
-  {
-    title: "Próximamente",
-    items: [
-      { href: '#', label: 'Administrativo', icon: GraduationCap, soon: true, disabled: true },
-      { href: '#', label: 'Integraciones',  icon: Plug,          soon: true, disabled: true },
-    ],
-  },
-];
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, setUser } = useAuthStore();
+  const { user, setUser, hasRole, isAdmin } = useAuthStore();
+
+  const sections: NavSection[] = [
+    {
+      title: "Operaciones",
+      items: [
+        { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+        { href: '/orders',      label: 'Órdenes',      icon: ShoppingCart,   visible: () => isAdmin() || hasRole("COMERCIAL") },
+        { href: '/catalog',     label: 'Catálogo',     icon: BookOpen,       visible: () => isAdmin() || hasRole("COMERCIAL") },
+        { href: '/inventory',   label: 'Inventario',   icon: Package,        visible: () => isAdmin() || hasRole("OPERATIVO") },
+        { href: '/production',  label: 'Producción',   icon: Factory,        visible: () => isAdmin() || hasRole("OPERATIVO") },
+        { href: '/fulfillment', label: 'Fulfillment',  icon: PackageCheck,   visible: () => isAdmin() || hasRole("OPERATIVO") },
+      ],
+    },
+    {
+      title: "Académico",
+      items: [
+        { href: '/academic/schools', label: 'Colegios',   icon: Building2, visible: () => isAdmin() },
+        { href: '/academic/grades',  label: 'Mis Grados', icon: Layers,    visible: () => isAdmin() || hasRole("DIRECTOR") },
+        { href: '/academic/courses', label: 'Mis Cursos', icon: BookOpen,  visible: () => isAdmin() || hasRole("DIRECTOR") || hasRole("TEACHER") || hasRole("STUDENT") },
+      ],
+    },
+    {
+      title: "Configuración",
+      items: [
+        { href: '/settings/users', label: 'Usuarios',          icon: Users2,  visible: () => isAdmin() },
+        { href: '/settings/roles', label: 'Roles y Permisos',  icon: Shield,  visible: () => isAdmin() },
+      ],
+    },
+    {
+      title: "Próximamente",
+      items: [
+        { href: '#', label: 'Administrativo', icon: GraduationCap, soon: true, disabled: true },
+        { href: '#', label: 'Integraciones',  icon: Plug,          soon: true, disabled: true },
+      ],
+    },
+  ];
+
+  const visibleSections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.visible || item.visible()),
+    }))
+    .filter((section) => section.items.length > 0);
 
   async function handleLogout() {
     await api.post("/auth/logout").catch(() => {});
@@ -96,7 +104,7 @@ export function Nav() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {NAV_SECTIONS.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title} className="mb-2">
             {/* Section title */}
             <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

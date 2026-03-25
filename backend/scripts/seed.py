@@ -22,9 +22,9 @@ from app.domains.auth.services.user_service import UserService
 from app.domains.inventory.models.stock_location import LocationType, StockLocation
 from app.domains.inventory.schemas.location import LocationCreate
 from app.domains.inventory.services.inventory_service import InventoryService
-from app.domains.rbac.models import Role
-from app.domains.rbac.repositories import RoleRepository
-from app.domains.rbac.schemas import RoleCreate
+from app.domains.rbac.models import Role, UserRole
+from app.domains.rbac.repositories import RoleRepository, UserRoleRepository
+from app.domains.rbac.schemas import RoleCreate, UserRoleCreate
 
 engine = create_engine(settings.database_url)
 
@@ -79,9 +79,12 @@ def seed_locations(session: Session) -> None:
 # ── Roles RBAC ────────────────────────────────────────────────────────────────
 
 ROLES = [
-    RoleCreate(name="ADMIN", description="Acceso completo a todos los módulos"),
-    RoleCreate(name="OPERATIVO", description="Producción, fulfillment e inventario"),
-    RoleCreate(name="COMERCIAL", description="Órdenes y catálogo"),
+    RoleCreate(name="ADMIN", description="Acceso total al sistema"),
+    RoleCreate(name="DIRECTOR", description="Director de grado en colegio"),
+    RoleCreate(name="TEACHER", description="Docente de curso"),
+    RoleCreate(name="STUDENT", description="Estudiante matriculado"),
+    RoleCreate(name="OPERATIVO", description="Personal de producción y bodega"),
+    RoleCreate(name="COMERCIAL", description="Personal de ventas y órdenes"),
 ]
 
 
@@ -94,6 +97,37 @@ def seed_roles(session: Session) -> None:
             continue
         repo.create(role_data)
         print(f"  [ok]   rol '{role_data.name}' creado")
+
+
+# ── Asignación usuario → rol ──────────────────────────────────────────────────
+
+USER_ROLE_ASSIGNMENTS = [
+    ("admin@robotschool.com", "ADMIN"),
+    ("director4@sanpedro.edu.co", "DIRECTOR"),
+    ("docente1@sanpedro.edu.co", "TEACHER"),
+    ("estudiante1@sanpedro.edu.co", "STUDENT"),
+    ("estudiante2@sanpedro.edu.co", "STUDENT"),
+]
+
+
+def seed_user_roles(session: Session) -> None:
+    role_repo = RoleRepository(session)
+    ur_repo = UserRoleRepository(session)
+    for email, role_name in USER_ROLE_ASSIGNMENTS:
+        user = session.exec(select(User).where(User.email == email)).first()
+        if user is None:
+            print(f"  [warn] usuario '{email}' no existe, saltando asignación")
+            continue
+        role = role_repo.get_by_name(role_name)
+        if role is None:
+            print(f"  [warn] rol '{role_name}' no existe, saltando asignación")
+            continue
+        existing = [ur for ur in ur_repo.list_by_user_id(user.id) if ur.role_id == role.id]
+        if existing:
+            print(f"  [skip] '{email}' ya tiene rol '{role_name}'")
+            continue
+        ur_repo.create(UserRoleCreate(user_id=user.id, role_id=role.id))
+        print(f"  [ok]   '{email}' → rol '{role_name}' asignado")
 
 
 # ── Académico ────────────────────────────────────────────────────────────────
@@ -267,8 +301,11 @@ def main() -> None:
         print("\n→ Roles RBAC:")
         seed_roles(session)
 
-        print("\n→ Académico:")
+        print("\n→ Académico (datos + usuarios):")
         seed_academic(session)
+
+        print("\n→ Asignación de roles a usuarios:")
+        seed_user_roles(session)
 
     print("\n✓ Seed completo.")
 

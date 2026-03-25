@@ -29,6 +29,7 @@ class UserRead(SQLModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    roles: list[str] = []
 
 
 class UserUpdate(SQLModel):

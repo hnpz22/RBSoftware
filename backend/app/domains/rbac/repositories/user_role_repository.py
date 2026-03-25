@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from app.domains.rbac.models import UserRole
+from app.domains.rbac.models import Role, UserRole
 from app.domains.rbac.schemas import UserRoleCreate, UserRoleUpdate
 
 
@@ -41,3 +41,11 @@ class UserRoleRepository:
     def delete(self, user_role: UserRole) -> None:
         self.session.delete(user_role)
         self.session.commit()
+
+    def get_role_names_for_user(self, user_id: int) -> list[str]:
+        statement = (
+            select(Role.name)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        )
+        return list(self.session.exec(statement).all())
