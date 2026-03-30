@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -58,9 +59,8 @@ class SubmissionWithStudent(SQLModel):
 
     public_id: UUID
     content: str | None
-    file_key: str | None
     file_name: str | None
-    status: str
+    status: Literal['PENDING', 'SUBMITTED', 'GRADED']
     score: int | None
     feedback: str | None
     submitted_at: datetime | None
@@ -83,7 +83,7 @@ class AssignmentWithSubmissions(SQLModel):
 
 
 class StudentCourseProgress(SQLModel):
-    course_id: str
+    course_id: UUID
     total_assignments: int
     submitted: int
     graded: int

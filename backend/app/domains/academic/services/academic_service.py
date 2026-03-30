@@ -301,14 +301,14 @@ class AcademicService:
         course = CourseRepository(session).get_by_id(unit.course_id)
         self._assert_admin_or_teacher(session, course, requesting_user_id)
 
+        file_key = None
         if data.type == "PDF" and file_bytes is not None:
-            key = f"academic/{course.id}/materials/{uuid4()}.pdf"
+            file_key = f"academic/{course.id}/materials/{uuid4()}.pdf"
             storage_service.upload_file(
-                file_bytes, key, content_type or "application/pdf"
+                file_bytes, file_key, content_type or "application/pdf"
             )
-            data.file_key = key
 
-        return MaterialRepository(session).create(unit_id, data)
+        return MaterialRepository(session).create(unit_id, data, file_key=file_key)
 
     def delete_material(
         self,

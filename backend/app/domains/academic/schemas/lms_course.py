@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -36,7 +37,7 @@ class MyCourseRead(SQLModel):
     grade_name: str
     school_name: str
     teacher_name: str
-    role: str  # "TEACHER" or "STUDENT"
+    role: Literal['TEACHER', 'STUDENT']
 
 
 class CourseUpdate(SQLModel):

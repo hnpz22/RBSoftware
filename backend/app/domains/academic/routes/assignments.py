@@ -146,7 +146,6 @@ def get_submissions(
         SubmissionWithStudent(
             public_id=sub.public_id,
             content=sub.content,
-            file_key=sub.file_key,
             file_name=sub.file_name,
             status=sub.status,
             score=sub.score,

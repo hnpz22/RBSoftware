@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -6,7 +7,7 @@ from sqlalchemy.types import Uuid
 from sqlmodel import Field, SQLModel
 
 
-class SubmissionStatus:
+class SubmissionStatus(str, enum.Enum):
     PENDING = "PENDING"
     SUBMITTED = "SUBMITTED"
     GRADED = "GRADED"
