@@ -42,8 +42,11 @@ class StorageService:
             self.bucket, key,
             expires=timedelta(seconds=expires_seconds),
         )
-        if settings.minio_public_endpoint and settings.minio_public_endpoint != settings.minio_endpoint:
-            url = url.replace(settings.minio_endpoint, settings.minio_public_endpoint, 1)
+        url = url.replace(
+            f"http://{settings.minio_endpoint}",
+            f"http://{settings.minio_public_endpoint}/storage",
+            1,
+        )
         return url
 
     def delete_file(self, key: str) -> None:
