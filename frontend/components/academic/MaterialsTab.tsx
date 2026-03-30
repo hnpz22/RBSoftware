@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, FileText, Film, Link2, Type, Trash2, Plus } from 'lucide-react'
+import { Eye, ExternalLink, FileText, Film, Link2, Type, Trash2, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import type { MaterialRead } from '@/lib/types'
 import { AddMaterialModal } from './AddMaterialModal'
+import { FileViewerModal } from '@/components/file-viewer-modal'
 
 const TYPE_ICON: Record<string, React.ElementType> = {
   PDF: FileText,
@@ -27,6 +28,10 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
   const [deleting, setDeleting] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerMaterialId, setViewerMaterialId] = useState<string | null>(null)
+  const [viewerFileName, setViewerFileName] = useState('')
+  const [viewerFileType, setViewerFileType] = useState<'PDF' | 'IMAGE'>('PDF')
 
   async function handleDelete(id: string) {
     setDeleting(id)
@@ -52,16 +57,15 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
     }
   }
 
-  async function handleOpen(m: MaterialRead) {
-    if (m.type === 'PDF' && m.has_file) {
-      setOpening(m.public_id)
-      try {
-        const { url } = await academicService.downloadMaterial(m.public_id)
-        window.open(url, '_blank')
-      } finally {
-        setOpening(null)
-      }
-    } else if ((m.type === 'VIDEO' || m.type === 'LINK') && m.content) {
+  function handleOpenViewer(m: MaterialRead) {
+    setViewerMaterialId(m.public_id)
+    setViewerFileName(m.title)
+    setViewerFileType('PDF')
+    setViewerOpen(true)
+  }
+
+  async function handleOpenExternal(m: MaterialRead) {
+    if ((m.type === 'VIDEO' || m.type === 'LINK') && m.content) {
       window.open(m.content, '_blank')
     }
   }
@@ -79,6 +83,14 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
         />
       )}
 
+      <FileViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        materialId={viewerMaterialId}
+        fileName={viewerFileName}
+        fileType={viewerFileType}
+      />
+
       <div className="space-y-2">
         {materials.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
@@ -87,7 +99,6 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
         )}
         {materials.map((m) => {
           const Icon = TYPE_ICON[m.type] ?? FileText
-          const canOpen = (m.type === 'PDF' && m.has_file) || ((m.type === 'VIDEO' || m.type === 'LINK') && m.content)
           return (
             <div
               key={m.public_id}
@@ -103,17 +114,25 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
                   </Badge>
                 </div>
                 <div className="flex items-center gap-1">
-                  {canOpen && (
+                  {m.type === 'PDF' && m.has_file && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={opening === m.public_id}
-                      onClick={() => handleOpen(m)}
+                      onClick={() => handleOpenViewer(m)}
+                      title="Vista previa"
+                    >
+                      <Eye size={14} />
+                      <span className="ml-1 text-xs">Vista previa</span>
+                    </Button>
+                  )}
+                  {(m.type === 'VIDEO' || m.type === 'LINK') && m.content && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleOpenExternal(m)}
                     >
                       <ExternalLink size={14} />
-                      <span className="ml-1 text-xs">
-                        {opening === m.public_id ? 'Abriendo...' : 'Ver'}
-                      </span>
+                      <span className="ml-1 text-xs">Ver</span>
                     </Button>
                   )}
                   {canEditContent && (

@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, FileText, Film, Link2, Type } from 'lucide-react'
+import { Eye, ExternalLink, FileText, Film, Link2, Type } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import * as academicService from '@/services/academic'
 import type { MaterialRead } from '@/lib/types'
+import { FileViewerModal } from '@/components/file-viewer-modal'
 
 const TYPE_ICON: Record<string, React.ElementType> = {
   PDF: FileText,
@@ -31,55 +31,65 @@ interface Props {
 
 export function StudentMaterialItem({ material }: Props) {
   const Icon = TYPE_ICON[material.type] ?? FileText
-  const [loadingUrl, setLoadingUrl] = useState(false)
-
-  async function handleOpenPdf() {
-    setLoadingUrl(true)
-    try {
-      const { url } = await academicService.downloadMaterial(material.public_id)
-      window.open(url, '_blank')
-    } finally {
-      setLoadingUrl(false)
-    }
-  }
+  const [viewerOpen, setViewerOpen] = useState(false)
 
   return (
-    <div className="rounded-md border p-3">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon size={14} className="text-muted-foreground" />
-        <span className="text-sm font-medium">{material.title}</span>
-      </div>
+    <>
+      <FileViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        materialId={material.public_id}
+        fileName={material.title}
+        fileType="PDF"
+      />
 
-      {material.type === 'TEXT' && material.content && (
-        <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
-          {material.content}
-        </p>
-      )}
+      <div className="rounded-md border p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Icon size={14} className="text-muted-foreground" />
+          <span className="text-sm font-medium">{material.title}</span>
+        </div>
 
-      {material.type === 'PDF' && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-1"
-          disabled={loadingUrl}
-          onClick={handleOpenPdf}
-        >
-          <ExternalLink size={12} />
-          <span className="ml-1">{loadingUrl ? 'Cargando…' : 'Ver PDF'}</span>
-        </Button>
-      )}
+        {material.type === 'TEXT' && material.content && (
+          <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
+            {material.content}
+          </p>
+        )}
 
-      {material.type === 'VIDEO' &&
-        material.content &&
-        (isEmbeddable(material.content) ? (
-          <div className="mt-2 aspect-video overflow-hidden rounded-md">
-            <iframe
-              src={toEmbedUrl(material.content)}
-              className="h-full w-full"
-              allowFullScreen
-            />
-          </div>
-        ) : (
+        {material.type === 'PDF' && material.has_file && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-1"
+            onClick={() => setViewerOpen(true)}
+          >
+            <Eye size={12} />
+            <span className="ml-1">Ver PDF</span>
+          </Button>
+        )}
+
+        {material.type === 'VIDEO' &&
+          material.content &&
+          (isEmbeddable(material.content) ? (
+            <div className="mt-2 aspect-video overflow-hidden rounded-md">
+              <iframe
+                src={toEmbedUrl(material.content)}
+                className="h-full w-full"
+                allowFullScreen
+              />
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1"
+              onClick={() => window.open(material.content!, '_blank')}
+            >
+              <ExternalLink size={12} />
+              <span className="ml-1">Ver video</span>
+            </Button>
+          ))}
+
+        {material.type === 'LINK' && material.content && (
           <Button
             size="sm"
             variant="outline"
@@ -87,21 +97,10 @@ export function StudentMaterialItem({ material }: Props) {
             onClick={() => window.open(material.content!, '_blank')}
           >
             <ExternalLink size={12} />
-            <span className="ml-1">Ver video</span>
+            <span className="ml-1">Abrir enlace</span>
           </Button>
-        ))}
-
-      {material.type === 'LINK' && material.content && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-1"
-          onClick={() => window.open(material.content!, '_blank')}
-        >
-          <ExternalLink size={12} />
-          <span className="ml-1">Abrir enlace</span>
-        </Button>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   )
 }

@@ -38,10 +38,13 @@ class StorageService:
         key: str,
         expires_seconds: int = 3600,
     ) -> str:
-        return self.client.presigned_get_object(
+        url = self.client.presigned_get_object(
             self.bucket, key,
             expires=timedelta(seconds=expires_seconds),
         )
+        if settings.minio_public_endpoint and settings.minio_public_endpoint != settings.minio_endpoint:
+            url = url.replace(settings.minio_endpoint, settings.minio_public_endpoint, 1)
+        return url
 
     def delete_file(self, key: str) -> None:
         try:
