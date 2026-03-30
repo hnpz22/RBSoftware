@@ -54,6 +54,8 @@ async def add_material(
     content_type = None
     if file is not None:
         file_bytes = await file.read()
+        if len(file_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File size exceeds 10 MB limit")
         content_type = file.content_type
     data = MaterialCreate(title=title, type=type, content=content)
     try:
