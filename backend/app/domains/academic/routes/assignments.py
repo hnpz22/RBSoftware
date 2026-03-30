@@ -21,6 +21,7 @@ from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.schemas.user import UserRead
+from app.domains.rbac.repositories import UserRoleRepository
 
 router = APIRouter(prefix="/academic", tags=["academic – assignments"])
 _svc = AcademicService()
@@ -77,7 +78,8 @@ def update_assignment(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
     unit = UnitRepository(session).get_by_id(assignment.unit_id)
     course = CourseRepository(session).get_by_id(unit.course_id)
-    if course.teacher_id != current_user.id:
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names and course.teacher_id != current_user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the teacher")
     return AssignmentRead.model_validate(repo.update(assignment, data))
 
@@ -136,7 +138,8 @@ def get_submissions(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
     unit = UnitRepository(session).get_by_id(assignment.unit_id)
     course = CourseRepository(session).get_by_id(unit.course_id)
-    if course.teacher_id != current_user.id:
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names and course.teacher_id != current_user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the teacher")
     rows = SubmissionRepository(session).get_by_assignment(assignment.id)
     return [

@@ -11,10 +11,12 @@ from app.core.database import get_session
 from app.domains.academic.repositories import (
     CourseRepository,
     CourseStudentRepository,
+    GradeDirectorRepository,
     GradeRepository,
     SchoolRepository,
     UnitRepository,
 )
+from app.domains.rbac.repositories import UserRoleRepository
 from app.domains.academic.schemas import (
     AssignmentRead, CourseDetail, CourseRead, CourseUpdate,
     MaterialRead, MyCourseRead, SubmissionRead, UnitRead,
@@ -133,12 +135,15 @@ def update_course(
     course_id: UUID,
     data: CourseUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     repo = CourseRepository(session)
     course = repo.get_by_public_id(course_id)
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(course.grade_id, current_user.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
     return CourseRead.model_validate(repo.update(course, data))
 
 
@@ -167,11 +172,16 @@ def assign_teacher(
 def list_students(
     course_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "DIRECTOR", "TEACHER")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR", "TEACHER")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names:
+        is_director = GradeDirectorRepository(session).is_director_of_grade(course.grade_id, current_user.id)
+        if not is_director and course.teacher_id != current_user.id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized for this course")
     return [
         UserRead.model_validate(s)
         for s in CourseStudentRepository(session).get_students(course.id)

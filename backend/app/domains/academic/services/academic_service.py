@@ -79,10 +79,14 @@ class AcademicService:
             "User must be admin, director of this grade, or teacher of this course"
         )
 
-    @staticmethod
-    def _assert_teacher(course: LmsCourse, user_id: int) -> None:
-        if course.teacher_id != user_id:
-            raise PermissionError("User is not the teacher of this course")
+    def _assert_admin_or_teacher(
+        self, session: Session, course: LmsCourse, user_id: int
+    ) -> None:
+        if self._is_admin(session, user_id):
+            return
+        if course.teacher_id == user_id:
+            return
+        raise PermissionError("User must be admin or teacher of this course")
 
     # ── Schools ──────────────────────────────────────────────────────────────
 
@@ -279,7 +283,7 @@ class AcademicService:
         course = CourseRepository(session).get_by_id(course_id)
         if course is None:
             raise LookupError("Course not found")
-        self._assert_teacher(course, requesting_user_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
         return UnitRepository(session).create(course_id, data)
 
     def add_material(
@@ -295,7 +299,7 @@ class AcademicService:
         if unit is None:
             raise LookupError("Unit not found")
         course = CourseRepository(session).get_by_id(unit.course_id)
-        self._assert_teacher(course, requesting_user_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
 
         if data.type == "PDF" and file_bytes is not None:
             key = f"academic/{course.id}/materials/{uuid4()}.pdf"
@@ -318,7 +322,7 @@ class AcademicService:
             raise LookupError("Material not found")
         unit = UnitRepository(session).get_by_id(material.unit_id)
         course = CourseRepository(session).get_by_id(unit.course_id)
-        self._assert_teacher(course, requesting_user_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
 
         if material.file_key:
             storage_service.delete_file(material.file_key)
@@ -337,7 +341,7 @@ class AcademicService:
         if unit is None:
             raise LookupError("Unit not found")
         course = CourseRepository(session).get_by_id(unit.course_id)
-        self._assert_teacher(course, requesting_user_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
         if publish:
             return repo.publish(unit)
         return repo.unpublish(unit)
@@ -353,7 +357,7 @@ class AcademicService:
         if unit is None:
             raise LookupError("Unit not found")
         course = CourseRepository(session).get_by_id(unit.course_id)
-        self._assert_teacher(course, requesting_user_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
         return AssignmentRepository(session).create(unit_id, data)
 
     def publish_assignment(
@@ -369,7 +373,7 @@ class AcademicService:
             raise LookupError("Assignment not found")
         unit = UnitRepository(session).get_by_id(assignment.unit_id)
         course = CourseRepository(session).get_by_id(unit.course_id)
-        self._assert_teacher(course, requesting_user_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
         return repo.update(assignment, AssignmentUpdate(is_published=publish))
 
     # ── Submissions ──────────────────────────────────────────────────────────
@@ -435,7 +439,7 @@ class AcademicService:
         assignment = AssignmentRepository(session).get_by_id(submission.assignment_id)
         unit = UnitRepository(session).get_by_id(assignment.unit_id)
         course = CourseRepository(session).get_by_id(unit.course_id)
-        self._assert_teacher(course, teacher_id)
+        self._assert_admin_or_teacher(session, course, teacher_id)
 
         if score < 0 or score > assignment.max_score:
             raise ValueError(

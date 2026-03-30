@@ -12,6 +12,7 @@ from app.domains.academic.repositories import (
     GradeDirectorRepository,
     GradeRepository,
 )
+from app.domains.rbac.repositories import UserRoleRepository
 from app.domains.academic.schemas import (
     CourseCreate, CourseRead, GradeRead, GradeUpdate, GradeWithCourses,
 )
@@ -49,11 +50,14 @@ def my_grades(
 def get_grade(
     grade_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(grade.id, current_user.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
     result = GradeRepository(session).get_with_courses(grade.id)
     if result is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
@@ -75,12 +79,15 @@ def update_grade(
     grade_id: UUID,
     data: GradeUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     repo = GradeRepository(session)
     grade = repo.get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(grade.id, current_user.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
     return GradeRead.model_validate(repo.update(grade, data))
 
 
@@ -125,11 +132,14 @@ def unassign_director(
 def list_courses(
     grade_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
+    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(grade.id, current_user.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
     return [
         CourseRead.model_validate(c)
         for c in CourseRepository(session).list_by_grade(grade.id)
