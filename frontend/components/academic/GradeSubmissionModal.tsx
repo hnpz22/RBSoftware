@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import * as academicService from '@/services/academic'
@@ -18,6 +18,7 @@ export function GradeSubmissionModal({ submission, onClose, onGraded }: Props) {
   const [feedback, setFeedback] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [downloadingFile, setDownloadingFile] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -36,9 +37,19 @@ export function GradeSubmissionModal({ submission, onClose, onGraded }: Props) {
     }
   }
 
+  async function handleOpenFile() {
+    setDownloadingFile(true)
+    try {
+      const { url } = await academicService.downloadSubmission(submission.public_id)
+      window.open(url, '_blank')
+    } finally {
+      setDownloadingFile(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-sm rounded-lg border bg-card shadow-xl">
+      <div className="w-full max-w-md rounded-lg border bg-card shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h3 className="font-semibold">
             Calificar — {submission.student.first_name}{' '}
@@ -50,8 +61,32 @@ export function GradeSubmissionModal({ submission, onClose, onGraded }: Props) {
         </div>
         <form onSubmit={handleSubmit} className="space-y-3 px-5 py-4">
           {submission.content && (
-            <div className="rounded-md bg-muted/30 p-3 text-sm">
-              {submission.content}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Respuesta:
+              </p>
+              <div className="rounded-md bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                {submission.content}
+              </div>
+            </div>
+          )}
+          {submission.file_name && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                Archivo: {submission.file_name}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={downloadingFile}
+                onClick={handleOpenFile}
+              >
+                <ExternalLink size={12} />
+                <span className="ml-1">
+                  {downloadingFile ? 'Abriendo...' : 'Ver'}
+                </span>
+              </Button>
             </div>
           )}
           <div className="space-y-1">

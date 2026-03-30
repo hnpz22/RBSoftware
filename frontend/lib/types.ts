@@ -311,7 +311,6 @@ export interface AssignmentRead {
 export interface SubmissionWithStudent {
   public_id: string
   content: string | null
-  file_key: string | null
   file_name: string | null
   status: string
   score: number | null

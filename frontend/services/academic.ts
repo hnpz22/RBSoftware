@@ -229,6 +229,10 @@ export function getAssignmentSubmissions(assignmentId: string) {
 
 // ── Grading ──────────────────────────────────────────────────────────────────
 
+export function downloadSubmission(submissionId: string) {
+  return api.get<{ url: string }>(`/academic/submissions/${submissionId}/download`)
+}
+
 export function gradeSubmission(
   submissionId: string,
   data: { score: number; feedback?: string | null },

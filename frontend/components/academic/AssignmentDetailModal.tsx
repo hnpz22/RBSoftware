@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
@@ -17,6 +17,8 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
   const [submissions, setSubmissions] = useState<SubmissionWithStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [gradingId, setGradingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -32,6 +34,16 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
   useEffect(() => {
     load()
   }, [assignmentId])
+
+  async function handleDownloadFile(submissionId: string) {
+    setDownloadingId(submissionId)
+    try {
+      const { url } = await academicService.downloadSubmission(submissionId)
+      window.open(url, '_blank')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   const gradingSub = submissions.find((s) => s.public_id === gradingId)
 
@@ -49,7 +61,7 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
       )}
 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="w-full max-w-2xl rounded-lg border bg-card shadow-xl">
+        <div className="w-full max-w-3xl rounded-lg border bg-card shadow-xl">
           <div className="flex items-center justify-between border-b px-5 py-4">
             <h3 className="font-semibold">Entregas</h3>
             <button
@@ -59,7 +71,7 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
               <X size={16} />
             </button>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+          <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
             {loading && (
               <p className="py-8 text-center text-muted-foreground">
                 Cargando…
@@ -71,57 +83,106 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
               </p>
             )}
             {!loading && submissions.length > 0 && (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-3 py-2 text-left font-medium">
-                      Estudiante
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium">Estado</th>
-                    <th className="px-3 py-2 text-left font-medium">
-                      Puntaje
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium">Fecha</th>
-                    <th className="px-3 py-2 text-left font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {submissions.map((s) => (
-                    <tr key={s.public_id} className="border-b last:border-0">
-                      <td className="px-3 py-2">
-                        {s.student.first_name} {s.student.last_name}
-                      </td>
-                      <td className="px-3 py-2">
+              <div className="space-y-3">
+                {submissions.map((s) => (
+                  <div
+                    key={s.public_id}
+                    className="rounded-lg border"
+                  >
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {s.student.first_name} {s.student.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {s.student.email}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <Badge
                           variant={
                             s.status === 'GRADED' ? 'success' : 'warning'
                           }
                         >
-                          {s.status}
+                          {s.status === 'GRADED' ? 'Calificado' : 'Entregado'}
                         </Badge>
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.score ?? '—'}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.submitted_at
-                          ? new Date(s.submitted_at).toLocaleDateString()
-                          : '—'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {s.status === 'SUBMITTED' && (
+                        {s.score !== null && (
+                          <span className="text-sm font-medium">
+                            {s.score} pts
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {s.submitted_at
+                            ? new Date(s.submitted_at).toLocaleDateString()
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="border-t px-4 py-3 space-y-2">
+                      {s.content && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            Respuesta del estudiante:
+                          </p>
+                          <div className="rounded-md bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                            {s.content}
+                          </div>
+                        </div>
+                      )}
+
+                      {s.file_name && (
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            Archivo: {s.file_name}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={downloadingId === s.public_id}
+                            onClick={() => handleDownloadFile(s.public_id)}
+                          >
+                            <ExternalLink size={12} />
+                            <span className="ml-1">
+                              {downloadingId === s.public_id ? 'Abriendo...' : 'Ver archivo'}
+                            </span>
+                          </Button>
+                        </div>
+                      )}
+
+                      {!s.content && !s.file_name && (
+                        <p className="text-xs text-muted-foreground italic">
+                          Sin contenido adjunto
+                        </p>
+                      )}
+
+                      {s.feedback && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            Retroalimentación:
+                          </p>
+                          <div className="rounded-md bg-green-50 dark:bg-green-900/10 p-3 text-sm">
+                            {s.feedback}
+                          </div>
+                        </div>
+                      )}
+
+                      {s.status === 'SUBMITTED' && (
+                        <div className="flex justify-end pt-1">
                           <Button
                             size="sm"
                             onClick={() => setGradingId(s.public_id)}
                           >
                             Calificar
                           </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex justify-end border-t px-5 py-3">

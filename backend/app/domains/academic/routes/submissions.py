@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.database import get_session
+from app.core.storage import storage_service
 from app.domains.academic.repositories import AssignmentRepository, SubmissionRepository
 from app.domains.academic.schemas import SubmissionRead
 from app.domains.academic.services import AcademicService
@@ -83,6 +84,21 @@ def get_my_submission(
     if submission is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No submission found")
     return SubmissionRead.model_validate(submission)
+
+
+@router.get("/submissions/{submission_id}/download")
+def download_submission(
+    submission_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TEACHER")),
+):
+    submission = SubmissionRepository(session).get_by_public_id(submission_id)
+    if submission is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Submission not found")
+    if not submission.file_key:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Submission has no file")
+    url = storage_service.generate_presigned_url(submission.file_key)
+    return {"url": url}
 
 
 @router.post(
