@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Film, Link2, Type, Trash2, Plus } from 'lucide-react'
+import { ExternalLink, FileText, Film, Link2, Type, Trash2, Plus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
@@ -26,6 +26,7 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
   const [showAdd, setShowAdd] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [opening, setOpening] = useState<string | null>(null)
 
   async function handleDelete(id: string) {
     setDeleting(id)
@@ -51,6 +52,20 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
     }
   }
 
+  async function handleOpen(m: MaterialRead) {
+    if (m.type === 'PDF' && m.has_file) {
+      setOpening(m.public_id)
+      try {
+        const { url } = await academicService.downloadMaterial(m.public_id)
+        window.open(url, '_blank')
+      } finally {
+        setOpening(null)
+      }
+    } else if ((m.type === 'VIDEO' || m.type === 'LINK') && m.content) {
+      window.open(m.content, '_blank')
+    }
+  }
+
   return (
     <>
       {showAdd && (
@@ -72,38 +87,61 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
         )}
         {materials.map((m) => {
           const Icon = TYPE_ICON[m.type] ?? FileText
+          const canOpen = (m.type === 'PDF' && m.has_file) || ((m.type === 'VIDEO' || m.type === 'LINK') && m.content)
           return (
             <div
               key={m.public_id}
-              className="flex items-center justify-between rounded-md border px-3 py-2"
+              className="rounded-md border px-3 py-2"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <Icon size={16} className="shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm">{m.title}</span>
-                <span className="text-xs text-muted-foreground">{m.type}</span>
-                <Badge variant={m.is_published ? 'success' : 'secondary'}>
-                  {m.is_published ? 'Publicado' : 'Borrador'}
-                </Badge>
-              </div>
-              {canEditContent && (
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={toggling === m.public_id}
-                    onClick={() => handleTogglePublish(m.public_id, m.is_published)}
-                  >
-                    {m.is_published ? 'Despublicar' : 'Publicar'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={deleting === m.public_id}
-                    onClick={() => handleDelete(m.public_id)}
-                  >
-                    <Trash2 size={14} className="text-destructive" />
-                  </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon size={16} className="shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm font-medium">{m.title}</span>
+                  <span className="text-xs text-muted-foreground">{m.type}</span>
+                  <Badge variant={m.is_published ? 'success' : 'secondary'}>
+                    {m.is_published ? 'Publicado' : 'Borrador'}
+                  </Badge>
                 </div>
+                <div className="flex items-center gap-1">
+                  {canOpen && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={opening === m.public_id}
+                      onClick={() => handleOpen(m)}
+                    >
+                      <ExternalLink size={14} />
+                      <span className="ml-1 text-xs">
+                        {opening === m.public_id ? 'Abriendo...' : 'Ver'}
+                      </span>
+                    </Button>
+                  )}
+                  {canEditContent && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={toggling === m.public_id}
+                        onClick={() => handleTogglePublish(m.public_id, m.is_published)}
+                      >
+                        {m.is_published ? 'Despublicar' : 'Publicar'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={deleting === m.public_id}
+                        onClick={() => handleDelete(m.public_id)}
+                      >
+                        <Trash2 size={14} className="text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {m.type === 'TEXT' && m.content && (
+                <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">
+                  {m.content}
+                </p>
               )}
             </div>
           )

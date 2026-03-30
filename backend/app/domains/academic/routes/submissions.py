@@ -42,8 +42,8 @@ async def submit_assignment(
     content_type = None
     if file is not None:
         file_bytes = await file.read()
-        if len(file_bytes) > 10 * 1024 * 1024:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File size exceeds 10 MB limit")
+        if len(file_bytes) > 100 * 1024 * 1024:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File size exceeds 100 MB limit")
         file_name = file.filename
         content_type = file.content_type
     try:
