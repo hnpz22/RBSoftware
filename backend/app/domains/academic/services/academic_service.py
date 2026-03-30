@@ -51,7 +51,7 @@ class AcademicService:
         role_repo = RoleRepository(session)
         for ur in user_roles:
             role = role_repo.get_by_id(ur.role_id)
-            if role is not None and role.name == "admin":
+            if role is not None and role.name.upper() == "ADMIN":
                 return True
         return False
 
@@ -468,16 +468,28 @@ class AcademicService:
     def get_my_courses_as_teacher(
         self, session: Session, user_id: int
     ) -> list[LmsCourse]:
+        if self._is_admin(session, user_id):
+            return CourseRepository(session).list_all_active()
+        director_grades = GradeDirectorRepository(session).get_grades_for_director(
+            user_id
+        )
+        if director_grades:
+            grade_ids = [g.id for g in director_grades]
+            return CourseRepository(session).list_by_grade_ids(grade_ids)
         return CourseRepository(session).list_by_teacher(user_id)
 
     def get_my_courses_as_student(
         self, session: Session, user_id: int
     ) -> list[LmsCourse]:
+        if self._is_admin(session, user_id):
+            return []
         return CourseStudentRepository(session).get_courses_for_student(user_id)
 
     def get_my_grades_as_director(
         self, session: Session, user_id: int
     ) -> list[LmsGrade]:
+        if self._is_admin(session, user_id):
+            return GradeRepository(session).list_all_active()
         return GradeDirectorRepository(session).get_grades_for_director(user_id)
 
     def get_course_content(

@@ -57,6 +57,27 @@ class CourseRepository:
         )
         return list(self.session.exec(stmt).all())
 
+    def list_all_active(self) -> list[LmsCourse]:
+        stmt = (
+            select(LmsCourse)
+            .where(LmsCourse.is_active.is_(True))
+            .order_by(LmsCourse.name)
+        )
+        return list(self.session.exec(stmt).all())
+
+    def list_by_grade_ids(self, grade_ids: list[int]) -> list[LmsCourse]:
+        if not grade_ids:
+            return []
+        stmt = (
+            select(LmsCourse)
+            .where(
+                LmsCourse.grade_id.in_(grade_ids),
+                LmsCourse.is_active.is_(True),
+            )
+            .order_by(LmsCourse.name)
+        )
+        return list(self.session.exec(stmt).all())
+
     def list_by_school(self, school_id: int) -> list[LmsCourse]:
         stmt = (
             select(LmsCourse)

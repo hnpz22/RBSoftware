@@ -37,6 +37,14 @@ class GradeRepository:
         )
         return list(self.session.exec(stmt).all())
 
+    def list_all_active(self) -> list[LmsGrade]:
+        stmt = (
+            select(LmsGrade)
+            .where(LmsGrade.is_active.is_(True))
+            .order_by(LmsGrade.name)
+        )
+        return list(self.session.exec(stmt).all())
+
     def get_with_courses(
         self, grade_id: int
     ) -> tuple[LmsGrade, list[LmsCourse], User | None]:
