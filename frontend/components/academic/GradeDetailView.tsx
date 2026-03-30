@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGradeDetail } from '@/hooks/useGradeDetail'
 import type { GradeStudent } from '@/hooks/useGradeDetail'
 import { TransferStudentModal } from './TransferStudentModal'
+import { CreateCourseModal } from './CreateCourseModal'
+import { useAuthStore } from '@/lib/store'
 
 interface Props {
   gradeId: string
@@ -20,6 +22,9 @@ export function GradeDetailView({ gradeId }: Props) {
     useGradeDetail(gradeId)
   const [tab, setTab] = useState<Tab>('courses')
   const [transferring, setTransferring] = useState<GradeStudent | null>(null)
+  const [showCreateCourse, setShowCreateCourse] = useState(false)
+  const { isAdmin, hasRole } = useAuthStore()
+  const canCreateCourse = isAdmin() || hasRole('DIRECTOR')
 
   if (loading) {
     return (
@@ -44,6 +49,17 @@ export function GradeDetailView({ gradeId }: Props) {
 
   return (
     <>
+      {showCreateCourse && grade && (
+        <CreateCourseModal
+          gradeId={grade.public_id}
+          onClose={() => setShowCreateCourse(false)}
+          onCreated={() => {
+            setShowCreateCourse(false)
+            reload()
+          }}
+        />
+      )}
+
       {transferring && (
         <TransferStudentModal
           student={transferring}
@@ -101,6 +117,15 @@ export function GradeDetailView({ gradeId }: Props) {
 
         {/* Courses tab */}
         {tab === 'courses' && (
+          <div className="space-y-3">
+            {canCreateCourse && (
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => setShowCreateCourse(true)}>
+                  <Plus size={14} />
+                  <span className="ml-1">Nuevo curso</span>
+                </Button>
+              </div>
+            )}
           <div className="rounded-lg border">
             <table className="w-full text-sm">
               <thead>
@@ -156,6 +181,7 @@ export function GradeDetailView({ gradeId }: Props) {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         )}
 
