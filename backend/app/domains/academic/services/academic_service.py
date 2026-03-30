@@ -509,6 +509,24 @@ class AcademicService:
 
         repo.delete(material)
 
+    def publish_material(
+        self,
+        session: Session,
+        material_id: int,
+        requesting_user_id: int,
+        publish: bool = True,
+    ) -> LmsMaterial:
+        repo = MaterialRepository(session)
+        material = repo.get_by_id(material_id)
+        if material is None:
+            raise LookupError("Material not found")
+        unit = UnitRepository(session).get_by_id(material.unit_id)
+        course = CourseRepository(session).get_by_id(unit.course_id)
+        self._assert_admin_or_teacher(session, course, requesting_user_id)
+        if publish:
+            return repo.publish(material)
+        return repo.unpublish(material)
+
     def publish_unit(
         self,
         session: Session,

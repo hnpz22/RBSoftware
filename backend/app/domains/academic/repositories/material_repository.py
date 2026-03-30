@@ -49,6 +49,20 @@ class MaterialRepository:
         self.session.refresh(material)
         return material
 
+    def publish(self, material: LmsMaterial) -> LmsMaterial:
+        material.is_published = True
+        self.session.add(material)
+        self.session.commit()
+        self.session.refresh(material)
+        return material
+
+    def unpublish(self, material: LmsMaterial) -> LmsMaterial:
+        material.is_published = False
+        self.session.add(material)
+        self.session.commit()
+        self.session.refresh(material)
+        return material
+
     def delete(self, material: LmsMaterial) -> None:
         self.session.delete(material)
         self.session.commit()

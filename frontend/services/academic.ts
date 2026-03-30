@@ -163,6 +163,14 @@ export function deleteMaterial(materialId: string) {
   return api.delete(`/academic/materials/${materialId}`)
 }
 
+export function publishMaterial(materialId: string) {
+  return api.post(`/academic/materials/${materialId}/publish`)
+}
+
+export function unpublishMaterial(materialId: string) {
+  return api.delete(`/academic/materials/${materialId}/publish`)
+}
+
 export function downloadMaterial(materialId: string) {
   return api.get<{ url: string }>(`/academic/materials/${materialId}/download`)
 }

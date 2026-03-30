@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { FileText, Film, Link2, Type, Trash2, Plus } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import type { MaterialRead } from '@/lib/types'
@@ -24,6 +25,7 @@ interface Props {
 export function MaterialsTab({ unitId, materials, onChanged, canEditContent = true }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [toggling, setToggling] = useState<string | null>(null)
 
   async function handleDelete(id: string) {
     setDeleting(id)
@@ -32,6 +34,20 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
       onChanged()
     } finally {
       setDeleting(null)
+    }
+  }
+
+  async function handleTogglePublish(id: string, isPublished: boolean) {
+    setToggling(id)
+    try {
+      if (isPublished) {
+        await academicService.unpublishMaterial(id)
+      } else {
+        await academicService.publishMaterial(id)
+      }
+      onChanged()
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -65,16 +81,29 @@ export function MaterialsTab({ unitId, materials, onChanged, canEditContent = tr
                 <Icon size={16} className="shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm">{m.title}</span>
                 <span className="text-xs text-muted-foreground">{m.type}</span>
+                <Badge variant={m.is_published ? 'success' : 'secondary'}>
+                  {m.is_published ? 'Publicado' : 'Borrador'}
+                </Badge>
               </div>
               {canEditContent && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={deleting === m.public_id}
-                  onClick={() => handleDelete(m.public_id)}
-                >
-                  <Trash2 size={14} className="text-destructive" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={toggling === m.public_id}
+                    onClick={() => handleTogglePublish(m.public_id, m.is_published)}
+                  >
+                    {m.is_published ? 'Despublicar' : 'Publicar'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={deleting === m.public_id}
+                    onClick={() => handleDelete(m.public_id)}
+                  >
+                    <Trash2 size={14} className="text-destructive" />
+                  </Button>
+                </div>
               )}
             </div>
           )
