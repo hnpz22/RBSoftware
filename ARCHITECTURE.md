@@ -73,7 +73,9 @@ backend/
 │   ├── core/
 │   │   ├── config.py         ← settings (pydantic-settings)
 │   │   ├── database.py       ← engine, session, get_session
-│   │   └── security.py       ← JWT, bcrypt, token utils
+│   │   ├── security.py       ← JWT, bcrypt, token utils
+│   │   ├── permissions.py    ← require_roles() dependency
+│   │   └── storage.py        ← MinIO storage service
 │   ├── api/
 │   │   ├── router.py         ← api_router principal
 │   │   └── routes/
@@ -87,7 +89,8 @@ backend/
 │       ├── inventory/
 │       ├── production/
 │       ├── fulfillment/
-│       └── integrations/
+│       ├── integrations/
+│       └── academic/
 ├── tests/
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -124,17 +127,17 @@ domains/{domain}/
 | production | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | fulfillment | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | integrations | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-
-### Próximo dominio en desarrollo
-
-`academic` — LMS para colegios (en diseño). Ver AGENTS.md.
+| academic | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Páginas frontend funcionales
 
 `/login`, `/dashboard`, `/orders`, `/orders/[id]`, `/orders/new`,
 `/catalog`, `/catalog/[id]`, `/inventory`, `/production`,
 `/production/[id]`, `/fulfillment`, `/fulfillment/[id]`,
-`/settings/users`, `/settings/roles`, `/reports`
+`/settings/users`, `/settings/roles`, `/reports`,
+`/academic/schools`, `/academic/schools/[id]`,
+`/academic/grades`, `/academic/grades/[id]`,
+`/academic/courses`, `/academic/courses/[id]`
 
 ---
 
@@ -201,6 +204,17 @@ domains/{domain}/
 - Estado de última sincronización
 - Tabla: `integration_sync_state`
 
+### academic
+- LMS para colegios aliados
+- Jerarquía: Colegio → Grado (Director) → Curso (Teacher) → Estudiante
+- Roles académicos: ADMIN, DIRECTOR, TEACHER, STUDENT
+- Contenido: Unidades → Materiales (PDF, TEXT, VIDEO, LINK) + Tareas
+- Entregas de estudiantes con calificación por docente
+- Storage en MinIO para PDFs de materiales y archivos de entregas
+- Tablas: `schools`, `lms_grades`, `lms_grade_directors`, `lms_courses`,
+  `lms_course_students`, `lms_units`, `lms_materials`, `lms_assignments`,
+  `lms_submissions`
+
 ---
 
 ## 7. Seguridad
@@ -227,7 +241,10 @@ El modelo completo está en `db.sql` (formato DBML) en la raíz del repo.
 `production_batches`, `production_batch_sales_orders`, `production_batch_items`,
 `production_item_counters`, `production_blocks`, `stock_locations`,
 `inventory_balances`, `inventory_movements`, `component_inventory_balances`,
-`component_inventory_movements`, `integration_sync_state`
+`component_inventory_movements`, `integration_sync_state`,
+`schools`, `lms_grades`, `lms_grade_directors`, `lms_courses`,
+`lms_course_students`, `lms_units`, `lms_materials`, `lms_assignments`,
+`lms_submissions`
 
 ---
 

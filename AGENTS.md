@@ -41,7 +41,7 @@ db.sql          modelo de datos completo (DBML) — fuente de verdad
 
 ```
 backend/app/
-  core/           config, database, security
+  core/           config, database, security, permissions, storage
   api/            router principal + health
   domains/
     auth/
@@ -286,9 +286,49 @@ Keys: academic/{course_id}/materials/{uuid}.pdf
       academic/{course_id}/submissions/{assignment_id}/
       {student_id}/{uuid}.{ext}
 
-Endpoints: /academic/schools, /academic/grades, /academic/courses,
-/academic/units, /academic/materials, /academic/assignments,
-/academic/submissions, /academic/students
+Endpoints de academic:
+```
+GET    /academic/schools
+POST   /academic/schools
+GET    /academic/schools/{school_id}
+PATCH  /academic/schools/{school_id}
+GET    /academic/schools/{school_id}/grades
+POST   /academic/schools/{school_id}/grades
+GET    /academic/my-grades
+GET    /academic/grades/{grade_id}
+PATCH  /academic/grades/{grade_id}
+POST   /academic/grades/{grade_id}/director
+DELETE /academic/grades/{grade_id}/director
+GET    /academic/grades/{grade_id}/courses
+POST   /academic/grades/{grade_id}/courses
+GET    /academic/my-courses
+GET    /academic/courses/{course_id}
+PATCH  /academic/courses/{course_id}
+POST   /academic/courses/{course_id}/teacher
+GET    /academic/courses/{course_id}/students
+POST   /academic/courses/{course_id}/students
+DELETE /academic/courses/{course_id}/students/{user_id}
+GET    /academic/courses/{course_id}/content
+GET    /academic/courses/{course_id}/units
+POST   /academic/courses/{course_id}/units
+PATCH  /academic/units/{unit_id}
+POST   /academic/units/{unit_id}/publish
+DELETE /academic/units/{unit_id}/publish
+GET    /academic/units/{unit_id}/materials
+POST   /academic/units/{unit_id}/materials          (FormData)
+DELETE /academic/materials/{material_id}
+GET    /academic/materials/{material_id}/download
+GET    /academic/units/{unit_id}/assignments
+POST   /academic/units/{unit_id}/assignments
+PATCH  /academic/assignments/{assignment_id}
+POST   /academic/assignments/{assignment_id}/publish
+DELETE /academic/assignments/{assignment_id}/publish
+GET    /academic/assignments/{assignment_id}/submissions
+POST   /academic/assignments/{assignment_id}/submit  (FormData)
+GET    /academic/assignments/{assignment_id}/my-submission
+POST   /academic/submissions/{submission_id}/grade
+POST   /academic/students/{student_id}/transfer
+```
 
 Frontend: /academic/schools, /academic/schools/[id],
 /academic/grades, /academic/grades/[id],
@@ -340,3 +380,5 @@ Endpoints protegidos en `backend/app/domains/academic/routes/`:
   extender cuando exista guard de permisos admin
 - Dominios no académicos (commercial, inventory, production, fulfillment)
   no tienen require_roles aplicado aún — solo usan get_current_user
+- N+1 en get_course_content del servicio (queries por unidad en loop)
+- No hay límite de tamaño en subida de archivos (await file.read())

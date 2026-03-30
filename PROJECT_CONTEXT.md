@@ -184,7 +184,20 @@ Un colegio no es solo una dirección de envío. Es una entidad con:
 - Fecha(s) de entrega acordadas
 - Posibles pedidos masivos (los papás compran individualmente pero la entrega es al colegio)
 - Opcionalmente: clases extracurriculares dictadas por RobotSchool (asistencia, docentes)
-- Opcionalmente: plataforma LMS para sus docentes y estudiantes
+- Plataforma LMS activa: gestión de grados, cursos, docentes,
+  estudiantes, materiales, tareas y entregas
+
+### Jerarquía académica implementada
+```
+Colegio (School)
+  └── Grado (LmsGrade) ← Director asignado
+       └── Curso (LmsCourse) ← Teacher asignado
+            ├── Estudiantes (LmsCourseStudent)
+            └── Unidades (LmsUnit)
+                 ├── Materiales (LmsMaterial) — PDF, TEXT, VIDEO, LINK
+                 └── Tareas (LmsAssignment)
+                      └── Entregas (LmsSubmission) — calificables
+```
 
 ---
 
@@ -212,10 +225,16 @@ Un colegio no es solo una dirección de envío. Es una entidad con:
 Todos los usuarios están en la tabla `users`. Las tablas de perfil extendido se agregan por tipo de actor cuando sea necesario.
 
 ### Usuarios internos (MVP)
-- **Operativos** — bodega, producción, packing, envíos
-- **Administrativos** — coordinadores, gestión interna, reportes
-- **Comerciales** — ventas, POS, backoffice
-- **Académicos** — docentes, coordinadores académicos
+- **Operativos** — bodega, producción, packing, envíos (rol: OPERATIVO)
+- **Administrativos** — coordinadores, gestión interna, reportes (rol: ADMIN)
+- **Comerciales** — ventas, POS, backoffice (rol: COMERCIAL)
+- **Académicos**:
+  - **Director** — personal del colegio, gestiona grados y cursos,
+    ligado a un solo colegio (rol: DIRECTOR)
+  - **Docente** — gestiona contenido de sus cursos, puede estar
+    en varios cursos (rol: TEACHER)
+  - **Estudiante** — login propio, ve material publicado,
+    entrega tareas (rol: STUDENT)
 
 ### Usuarios externos (fase futura)
 - Clientes, padres de familia, colegios
@@ -251,9 +270,16 @@ Lo que genera ingresos y resuelve el caos operativo inmediato:
 - Colegios como entidad completa (contratos, fechas, entregas masivas)
 - Integración Wompi avanzada
 
-### Fase 3 — Académico
-- **Escuela interna**: cursos, estudiantes inscritos, asistencia, mensualidades, docentes, horarios
-- **Colegios / LMS**: plataforma para colegios externos (material, tareas, asistencia extracurricular)
+### Fase 3 — Académico (implementado)
+- **LMS para colegios**: plataforma implementada con jerarquía
+  Colegio → Grado → Curso → Estudiante
+- Roles: DIRECTOR (gestión de grados), TEACHER (contenido y calificación),
+  STUDENT (entregas y consulta de material)
+- Contenido: Unidades con materiales (PDF, texto, video, link)
+  y tareas con entregas calificables
+- Storage: MinIO para PDFs de materiales y archivos de entregas
+- Frontend: vistas diferenciadas para docente y estudiante
+- Pendiente: Escuela interna (asistencia, mensualidades, horarios)
 
 ---
 
