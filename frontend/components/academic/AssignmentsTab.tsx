@@ -12,9 +12,10 @@ interface Props {
   unitId: string
   assignments: AssignmentRead[]
   onChanged: () => void
+  canEditContent?: boolean
 }
 
-export function AssignmentsTab({ unitId, assignments, onChanged }: Props) {
+export function AssignmentsTab({ unitId, assignments, onChanged, canEditContent = true }: Props) {
   const [showCreate, setShowCreate] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -67,15 +68,17 @@ export function AssignmentsTab({ unitId, assignments, onChanged }: Props) {
             </div>
           </div>
         ))}
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full"
-          onClick={() => setShowCreate(true)}
-        >
-          <Plus size={14} />
-          <span className="ml-2">Nueva tarea</span>
-        </Button>
+        {canEditContent && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowCreate(true)}
+          >
+            <Plus size={14} />
+            <span className="ml-2">Nueva tarea</span>
+          </Button>
+        )}
       </div>
     </>
   )

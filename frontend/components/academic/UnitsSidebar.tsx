@@ -10,18 +10,21 @@ interface Props {
   selectedId: string | null
   onSelect: (id: string) => void
   onCreateUnit: () => void
+  canEditContent?: boolean
 }
 
-export function UnitsSidebar({ units, selectedId, onSelect, onCreateUnit }: Props) {
+export function UnitsSidebar({ units, selectedId, onSelect, onCreateUnit, canEditContent = true }: Props) {
   return (
     <div className="flex w-64 shrink-0 flex-col border-r bg-muted/20">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Unidades
         </p>
-        <Button size="sm" variant="ghost" onClick={onCreateUnit}>
-          <Plus size={14} />
-        </Button>
+        {canEditContent && (
+          <Button size="sm" variant="ghost" onClick={onCreateUnit}>
+            <Plus size={14} />
+          </Button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {units.length === 0 && (

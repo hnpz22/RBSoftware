@@ -9,9 +9,10 @@ import { EnrollStudentModal } from './EnrollStudentModal'
 
 interface Props {
   course: CourseDetail
+  onStudentChanged: () => void
 }
 
-export function CourseStudentsTab({ course }: Props) {
+export function CourseStudentsTab({ course, onStudentChanged }: Props) {
   const [showEnroll, setShowEnroll] = useState(false)
   const { isAdmin, hasRole } = useAuthStore()
 
@@ -25,7 +26,7 @@ export function CourseStudentsTab({ course }: Props) {
           onClose={() => setShowEnroll(false)}
           onEnrolled={() => {
             setShowEnroll(false)
-            window.location.reload()
+            onStudentChanged()
           }}
         />
       )}

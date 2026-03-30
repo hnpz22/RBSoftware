@@ -13,11 +13,12 @@ interface Props {
   course: CourseDetail
   units: UnitRead[]
   reload: () => void
+  canEditContent: boolean
 }
 
 type CourseTab = 'content' | 'students'
 
-export function TeacherCourseView({ course, units, reload }: Props) {
+export function TeacherCourseView({ course, units, reload, canEditContent }: Props) {
   const router = useRouter()
   const [courseTab, setCourseTab] = useState<CourseTab>('content')
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(
@@ -46,7 +47,6 @@ export function TeacherCourseView({ course, units, reload }: Props) {
       )}
 
       <div className="flex h-full flex-col">
-        {/* Header */}
         <div className="shrink-0 border-b px-4 py-3">
           <button
             onClick={() => router.push('/academic/courses')}
@@ -62,7 +62,6 @@ export function TeacherCourseView({ course, units, reload }: Props) {
           </p>
         </div>
 
-        {/* Course-level tabs */}
         <div className="flex shrink-0 border-b px-4">
           {courseTabs.map((t) => (
             <button
@@ -79,7 +78,6 @@ export function TeacherCourseView({ course, units, reload }: Props) {
           ))}
         </div>
 
-        {/* Content tab: sidebar + unit detail */}
         {courseTab === 'content' && (
           <div className="flex flex-1 overflow-hidden">
             <UnitsSidebar
@@ -87,19 +85,20 @@ export function TeacherCourseView({ course, units, reload }: Props) {
               selectedId={selectedUnitId}
               onSelect={setSelectedUnitId}
               onCreateUnit={() => setShowCreateUnit(true)}
+              canEditContent={canEditContent}
             />
             <UnitDetailPanel
               unit={selectedUnit}
               course={course}
               onUnitChanged={reload}
+              canEditContent={canEditContent}
             />
           </div>
         )}
 
-        {/* Students tab */}
         {courseTab === 'students' && (
           <div className="flex-1 overflow-y-auto p-4">
-            <CourseStudentsTab course={course} />
+            <CourseStudentsTab course={course} onStudentChanged={reload} />
           </div>
         )}
       </div>

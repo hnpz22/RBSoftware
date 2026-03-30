@@ -6,9 +6,11 @@ export function useCourseDetail(courseId: string) {
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [units, setUnits] = useState<UnitRead[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
+    setError(null)
     try {
       const [c, u] = await Promise.all([
         academicService.getCourseDetail(courseId),
@@ -16,6 +18,8 @@ export function useCourseDetail(courseId: string) {
       ])
       setCourse(c)
       setUnits(u)
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar curso')
     } finally {
       setLoading(false)
     }
@@ -25,5 +29,5 @@ export function useCourseDetail(courseId: string) {
     load()
   }, [courseId])
 
-  return { course, units, loading, reload: load }
+  return { course, units, loading, error, reload: load }
 }

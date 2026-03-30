@@ -18,9 +18,10 @@ interface Props {
   unitId: string
   materials: MaterialRead[]
   onChanged: () => void
+  canEditContent?: boolean
 }
 
-export function MaterialsTab({ unitId, materials, onChanged }: Props) {
+export function MaterialsTab({ unitId, materials, onChanged, canEditContent = true }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
 
@@ -65,26 +66,30 @@ export function MaterialsTab({ unitId, materials, onChanged }: Props) {
                 <span className="truncate text-sm">{m.title}</span>
                 <span className="text-xs text-muted-foreground">{m.type}</span>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={deleting === m.public_id}
-                onClick={() => handleDelete(m.public_id)}
-              >
-                <Trash2 size={14} className="text-destructive" />
-              </Button>
+              {canEditContent && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={deleting === m.public_id}
+                  onClick={() => handleDelete(m.public_id)}
+                >
+                  <Trash2 size={14} className="text-destructive" />
+                </Button>
+              )}
             </div>
           )
         })}
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full"
-          onClick={() => setShowAdd(true)}
-        >
-          <Plus size={14} />
-          <span className="ml-2">Agregar material</span>
-        </Button>
+        {canEditContent && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowAdd(true)}
+          >
+            <Plus size={14} />
+            <span className="ml-2">Agregar material</span>
+          </Button>
+        )}
       </div>
     </>
   )

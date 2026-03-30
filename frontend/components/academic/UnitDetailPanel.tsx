@@ -12,11 +12,12 @@ interface Props {
   unit: UnitRead | null
   course: CourseDetail
   onUnitChanged: () => void
+  canEditContent?: boolean
 }
 
 type Tab = 'materials' | 'assignments'
 
-export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
+export function UnitDetailPanel({ unit, course, onUnitChanged, canEditContent = true }: Props) {
   const [tab, setTab] = useState<Tab>('materials')
   const { materials, assignments, loading, reload } = useUnitContent(
     unit?.public_id ?? null,
@@ -56,14 +57,16 @@ export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
       <div className="shrink-0 border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{unit.title}</h2>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={toggling}
-            onClick={handleTogglePublish}
-          >
-            {unit.is_published ? 'Despublicar' : 'Publicar'}
-          </Button>
+          {canEditContent && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={toggling}
+              onClick={handleTogglePublish}
+            >
+              {unit.is_published ? 'Despublicar' : 'Publicar'}
+            </Button>
+          )}
         </div>
         {unit.description && (
           <p className="mt-1 text-sm text-muted-foreground">
@@ -97,6 +100,7 @@ export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
             unitId={unit.public_id}
             materials={materials}
             onChanged={reload}
+            canEditContent={canEditContent}
           />
         )}
         {!loading && tab === 'assignments' && (
@@ -104,6 +108,7 @@ export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
             unitId={unit.public_id}
             assignments={assignments}
             onChanged={reload}
+            canEditContent={canEditContent}
           />
         )}
       </div>

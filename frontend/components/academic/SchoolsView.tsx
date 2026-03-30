@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSchools } from '@/hooks/useSchools'
+import { useAuthStore } from '@/lib/store'
 import { SchoolsTable } from './SchoolsTable'
 import { CreateSchoolModal } from './CreateSchoolModal'
 
 export function SchoolsView() {
   const router = useRouter()
-  const { schools, gradeCountMap, loading, reload } = useSchools()
+  const { schools, gradeCountMap, loading, error, reload } = useSchools()
+  const { isAdmin } = useAuthStore()
   const [showCreate, setShowCreate] = useState(false)
 
   return (
@@ -46,12 +48,20 @@ export function SchoolsView() {
               />
               <span className="ml-2">Actualizar</span>
             </Button>
-            <Button size="sm" onClick={() => setShowCreate(true)}>
-              <Plus size={14} />
-              <span className="ml-2">Nuevo colegio</span>
-            </Button>
+            {isAdmin() && (
+              <Button size="sm" onClick={() => setShowCreate(true)}>
+                <Plus size={14} />
+                <span className="ml-2">Nuevo colegio</span>
+              </Button>
+            )}
           </div>
         </div>
+
+        {!loading && error && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <SchoolsTable
           schools={schools}

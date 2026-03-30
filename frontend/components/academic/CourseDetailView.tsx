@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function CourseDetailView({ courseId }: Props) {
-  const { course, units, loading, reload } = useCourseDetail(courseId)
+  const { course, units, loading, error, reload } = useCourseDetail(courseId)
   const user = useAuthStore((s) => s.user)
   const { isAdmin, hasRole } = useAuthStore()
 
@@ -18,6 +18,14 @@ export function CourseDetailView({ courseId }: Props) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         Cargando…
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-sm text-destructive">
+        {error}
       </div>
     )
   }
@@ -32,10 +40,16 @@ export function CourseDetailView({ courseId }: Props) {
 
   const isTeacher = course.teacher.public_id === user?.public_id
   const canManage = isTeacher || isAdmin() || hasRole('DIRECTOR')
+  const canEditContent = isTeacher || isAdmin()
 
   if (canManage) {
     return (
-      <TeacherCourseView course={course} units={units} reload={reload} />
+      <TeacherCourseView
+        course={course}
+        units={units}
+        reload={reload}
+        canEditContent={canEditContent}
+      />
     )
   }
 

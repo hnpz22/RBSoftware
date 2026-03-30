@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSchoolDetail } from '@/hooks/useSchoolDetail'
+import { useAuthStore } from '@/lib/store'
 import { GradesTable } from './GradesTable'
 import { EditSchoolModal } from './EditSchoolModal'
 import { CreateGradeModal } from './CreateGradeModal'
@@ -16,8 +17,9 @@ interface Props {
 
 export function SchoolDetailView({ schoolId }: Props) {
   const router = useRouter()
-  const { school, setSchool, grades, loading, reload } =
+  const { school, setSchool, grades, loading, error, reload } =
     useSchoolDetail(schoolId)
+  const { isAdmin } = useAuthStore()
 
   const [showEdit, setShowEdit] = useState(false)
   const [showCreateGrade, setShowCreateGrade] = useState(false)
@@ -27,6 +29,14 @@ export function SchoolDetailView({ schoolId }: Props) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         Cargando…
+      </div>
+    )
+  }
+
+  if (!loading && error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-sm text-destructive">
+        {error}
       </div>
     )
   }
@@ -73,7 +83,6 @@ export function SchoolDetailView({ schoolId }: Props) {
       )}
 
       <div className="space-y-6">
-        {/* Header */}
         <div>
           <button
             onClick={() => router.push('/academic/schools')}
@@ -93,25 +102,28 @@ export function SchoolDetailView({ schoolId }: Props) {
                 <RefreshCw size={14} />
                 <span className="ml-2">Actualizar</span>
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowEdit(true)}
-              >
-                Editar info
-              </Button>
+              {isAdmin() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEdit(true)}
+                >
+                  Editar info
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Grades section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Grados</h2>
-            <Button size="sm" onClick={() => setShowCreateGrade(true)}>
-              <Plus size={14} />
-              <span className="ml-2">Nuevo grado</span>
-            </Button>
+            {isAdmin() && (
+              <Button size="sm" onClick={() => setShowCreateGrade(true)}>
+                <Plus size={14} />
+                <span className="ml-2">Nuevo grado</span>
+              </Button>
+            )}
           </div>
           <GradesTable
             grades={grades}

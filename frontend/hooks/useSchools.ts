@@ -6,9 +6,11 @@ export function useSchools() {
   const [schools, setSchools] = useState<School[]>([])
   const [gradeCountMap, setGradeCountMap] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
+    setError(null)
     try {
       const list = await academicService.listSchools()
       setSchools(list)
@@ -25,6 +27,8 @@ export function useSchools() {
         ),
       )
       setGradeCountMap(Object.fromEntries(entries))
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar colegios')
     } finally {
       setLoading(false)
     }
@@ -34,5 +38,5 @@ export function useSchools() {
     load()
   }, [])
 
-  return { schools, gradeCountMap, loading, reload: load }
+  return { schools, gradeCountMap, loading, error, reload: load }
 }

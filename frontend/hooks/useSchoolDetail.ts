@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import * as academicService from '@/services/academic'
-import type { GradeWithCourses, School } from '@/lib/types'
+import type { Grade, GradeWithCourses, School } from '@/lib/types'
 
 export function useSchoolDetail(schoolId: string) {
   const [school, setSchool] = useState<School | null>(null)
   const [grades, setGrades] = useState<GradeWithCourses[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
+    setError(null)
     try {
       const [s, basicGrades] = await Promise.all([
         academicService.getSchool(schoolId),
@@ -16,13 +18,18 @@ export function useSchoolDetail(schoolId: string) {
       ])
       setSchool(s)
 
-      // Enrich each grade with director + courses
       const enriched = await Promise.all(
-        basicGrades.map((g) =>
-          academicService.getGrade(g.public_id).catch(() => g),
+        basicGrades.map((g: Grade) =>
+          academicService.getGrade(g.public_id).catch(() => ({
+            ...g,
+            courses: [],
+            director: null,
+          } as GradeWithCourses)),
         ),
       )
       setGrades(enriched)
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar colegio')
     } finally {
       setLoading(false)
     }
@@ -32,5 +39,5 @@ export function useSchoolDetail(schoolId: string) {
     load()
   }, [schoolId])
 
-  return { school, setSchool, grades, loading, reload: load }
+  return { school, setSchool, grades, loading, error, reload: load }
 }

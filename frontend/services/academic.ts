@@ -52,7 +52,7 @@ export function updateSchool(
 // ── Grades ───────────────────────────────────────────────────────────────────
 
 export function listGradesBySchool(schoolId: string) {
-  return api.get<GradeWithCourses[]>(`/academic/schools/${schoolId}/grades`)
+  return api.get<Grade[]>(`/academic/schools/${schoolId}/grades`)
 }
 
 export function getMyGrades() {
@@ -67,7 +67,7 @@ export function createGrade(
   schoolId: string,
   data: { name: string; description?: string | null },
 ) {
-  return api.post<GradeWithCourses>(
+  return api.post<Grade>(
     `/academic/schools/${schoolId}/grades`,
     data,
   )

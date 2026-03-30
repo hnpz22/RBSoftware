@@ -12,7 +12,7 @@ interface Props {
 
 export function StudentCourseView({ course }: Props) {
   const router = useRouter()
-  const { units, loading, reload } = useStudentCourse(course.public_id)
+  const { units, loading, error, reload } = useStudentCourse(course.public_id)
 
   const totalAssignments = units.reduce(
     (sum, u) => sum + u.assignments.length,
@@ -30,7 +30,6 @@ export function StudentCourseView({ course }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <button
           onClick={() => router.push('/academic/courses')}
@@ -44,7 +43,6 @@ export function StudentCourseView({ course }: Props) {
         </p>
       </div>
 
-      {/* Progress bar */}
       <div className="space-y-1">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Progreso de tareas</span>
@@ -60,12 +58,17 @@ export function StudentCourseView({ course }: Props) {
         </div>
       </div>
 
-      {/* Content */}
       {loading && (
         <p className="py-12 text-center text-muted-foreground">Cargando…</p>
       )}
 
-      {!loading && units.length === 0 && (
+      {!loading && error && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && units.length === 0 && (
         <p className="py-12 text-center text-muted-foreground">
           No hay contenido publicado
         </p>

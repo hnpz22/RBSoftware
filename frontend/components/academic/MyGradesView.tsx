@@ -7,7 +7,7 @@ import { useMyGrades } from '@/hooks/useMyGrades'
 
 export function MyGradesView() {
   const router = useRouter()
-  const { grades, loading, reload } = useMyGrades()
+  const { grades, loading, error, reload } = useMyGrades()
 
   return (
     <div className="space-y-4">
@@ -28,7 +28,13 @@ export function MyGradesView() {
         <p className="py-12 text-center text-muted-foreground">Cargando…</p>
       )}
 
-      {!loading && grades.length === 0 && (
+      {!loading && error && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && grades.length === 0 && (
         <p className="py-12 text-center text-muted-foreground">
           No tienes grados asignados
         </p>

@@ -21,9 +21,11 @@ export function useGradeDetail(gradeId: string) {
   const [courseRows, setCourseRows] = useState<GradeCourseRow[]>([])
   const [students, setStudents] = useState<GradeStudent[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
+    setError(null)
     try {
       const g = await academicService.getGrade(gradeId)
       setGrade(g)
@@ -53,6 +55,8 @@ export function useGradeDetail(gradeId: string) {
 
       setCourseRows(rows)
       setStudents(studs)
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar grado')
     } finally {
       setLoading(false)
     }
@@ -62,5 +66,5 @@ export function useGradeDetail(gradeId: string) {
     load()
   }, [gradeId])
 
-  return { grade, courseRows, students, loading, reload: load }
+  return { grade, courseRows, students, loading, error, reload: load }
 }

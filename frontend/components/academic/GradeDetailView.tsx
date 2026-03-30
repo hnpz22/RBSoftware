@@ -18,7 +18,7 @@ type Tab = 'courses' | 'students'
 
 export function GradeDetailView({ gradeId }: Props) {
   const router = useRouter()
-  const { grade, courseRows, students, loading, reload } =
+  const { grade, courseRows, students, loading, error, reload } =
     useGradeDetail(gradeId)
   const [tab, setTab] = useState<Tab>('courses')
   const [transferring, setTransferring] = useState<GradeStudent | null>(null)
@@ -30,6 +30,14 @@ export function GradeDetailView({ gradeId }: Props) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         Cargando…
+      </div>
+    )
+  }
+
+  if (!loading && error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-sm text-destructive">
+        {error}
       </div>
     )
   }
