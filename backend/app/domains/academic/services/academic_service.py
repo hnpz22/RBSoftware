@@ -480,8 +480,11 @@ class AcademicService:
     ) -> list[LmsGrade]:
         return GradeDirectorRepository(session).get_grades_for_director(user_id)
 
-    def get_course_content_for_student(
-        self, session: Session, course_id: int, student_id: int
+    def get_course_content(
+        self,
+        session: Session,
+        course_id: int,
+        requesting_user_id: int,
     ) -> tuple[
         LmsCourse,
         list[
@@ -496,10 +499,26 @@ class AcademicService:
         if course is None:
             raise LookupError("Course not found")
 
-        if not CourseStudentRepository(session).is_enrolled(course_id, student_id):
-            raise PermissionError("Student is not enrolled in this course")
+        is_admin = self._is_admin(session, requesting_user_id)
+        is_teacher = course.teacher_id == requesting_user_id
+        is_director = GradeDirectorRepository(session).is_director_of_grade(
+            course.grade_id, requesting_user_id
+        )
+        is_student = CourseStudentRepository(session).is_enrolled(
+            course_id, requesting_user_id
+        )
 
-        units = UnitRepository(session).list_by_course(course_id, published_only=True)
+        if not (is_admin or is_teacher or is_director or is_student):
+            raise PermissionError(
+                "User must be admin, teacher, director, or enrolled student"
+            )
+
+        # Teacher/admin see everything (drafts included); others only published
+        published_only = not (is_admin or is_teacher)
+
+        units = UnitRepository(session).list_by_course(
+            course_id, published_only=published_only
+        )
         result: list[
             tuple[
                 LmsUnit,
@@ -509,16 +528,18 @@ class AcademicService:
         ] = []
         for unit in units:
             materials = MaterialRepository(session).list_by_unit(
-                unit.id, published_only=True
+                unit.id, published_only=published_only
             )
             assignments = AssignmentRepository(session).list_by_unit(
-                unit.id, published_only=True
+                unit.id, published_only=published_only
             )
             assignment_data: list[tuple[LmsAssignment, LmsSubmission | None]] = []
             for a in assignments:
-                sub = SubmissionRepository(session).get_by_student_and_assignment(
-                    student_id, a.id
-                )
+                sub = None
+                if is_student:
+                    sub = SubmissionRepository(session).get_by_student_and_assignment(
+                        requesting_user_id, a.id
+                    )
                 assignment_data.append((a, sub))
             result.append((unit, materials, assignment_data))
 

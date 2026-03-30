@@ -7,7 +7,6 @@ import { useUnitContent } from '@/hooks/useUnitContent'
 import * as academicService from '@/services/academic'
 import { MaterialsTab } from './MaterialsTab'
 import { AssignmentsTab } from './AssignmentsTab'
-import { CourseStudentsTab } from './CourseStudentsTab'
 
 interface Props {
   unit: UnitRead | null
@@ -15,7 +14,7 @@ interface Props {
   onUnitChanged: () => void
 }
 
-type Tab = 'materials' | 'assignments' | 'students'
+type Tab = 'materials' | 'assignments'
 
 export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
   const [tab, setTab] = useState<Tab>('materials')
@@ -50,7 +49,6 @@ export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'materials', label: 'Materiales' },
     { key: 'assignments', label: 'Tareas' },
-    { key: 'students', label: 'Estudiantes' },
   ]
 
   return (
@@ -107,9 +105,6 @@ export function UnitDetailPanel({ unit, course, onUnitChanged }: Props) {
             assignments={assignments}
             onChanged={reload}
           />
-        )}
-        {!loading && tab === 'students' && (
-          <CourseStudentsTab course={course} />
         )}
       </div>
     </div>

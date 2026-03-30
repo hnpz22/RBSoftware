@@ -11,11 +11,13 @@ from app.core.database import get_session
 from app.domains.academic.repositories import (
     CourseRepository,
     CourseStudentRepository,
+    GradeRepository,
+    SchoolRepository,
     UnitRepository,
 )
 from app.domains.academic.schemas import (
     AssignmentRead, CourseDetail, CourseRead, CourseUpdate,
-    MaterialRead, SubmissionRead, UnitRead,
+    MaterialRead, MyCourseRead, SubmissionRead, UnitRead,
 )
 from app.domains.academic.services import AcademicService
 from app.core.permissions import require_roles
@@ -60,20 +62,45 @@ class _UnitStudentView(BaseModel):
     assignments: list[_AssignmentStudentView] = []
 
 
-@router.get("/my-courses", response_model=list[CourseRead])
+@router.get("/my-courses", response_model=list[MyCourseRead])
 def my_courses(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    teacher = _svc.get_my_courses_as_teacher(session, current_user.id)
-    student = _svc.get_my_courses_as_student(session, current_user.id)
+    teacher_courses = _svc.get_my_courses_as_teacher(session, current_user.id)
+    student_courses = _svc.get_my_courses_as_student(session, current_user.id)
+
+    teacher_ids = {c.id for c in teacher_courses}
     seen: set[int] = set()
-    combined = []
-    for c in teacher + student:
-        if c.id not in seen:
-            seen.add(c.id)
-            combined.append(c)
-    return [CourseRead.model_validate(c) for c in combined]
+    result: list[MyCourseRead] = []
+
+    for c in teacher_courses + student_courses:
+        if c.id in seen:
+            continue
+        seen.add(c.id)
+
+        grade = GradeRepository(session).get_by_id(c.grade_id)
+        school = SchoolRepository(session).get_by_id(c.school_id)
+        teacher = UserRepository(session).get_by_id(c.teacher_id)
+
+        result.append(
+            MyCourseRead(
+                public_id=c.public_id,
+                name=c.name,
+                description=c.description,
+                is_active=c.is_active,
+                created_at=c.created_at,
+                updated_at=c.updated_at,
+                grade_name=grade.name if grade else "",
+                school_name=school.name if school else "",
+                teacher_name=(
+                    f"{teacher.first_name} {teacher.last_name}" if teacher else ""
+                ),
+                role="TEACHER" if c.id in teacher_ids else "STUDENT",
+            )
+        )
+
+    return result
 
 
 @router.get("/courses/{course_id}", response_model=CourseDetail)
@@ -205,7 +232,7 @@ def get_course_content(
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
     try:
-        _, units_data = _svc.get_course_content_for_student(
+        _, units_data = _svc.get_course_content(
             session, course.id, current_user.id
         )
     except LookupError as exc:

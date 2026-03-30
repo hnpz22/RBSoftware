@@ -17,6 +17,7 @@ from app.domains.academic.schemas.lms_course import (
     CourseCreate,
     CourseRead,
     CourseUpdate,
+    MyCourseRead,
 )
 from app.domains.academic.schemas.lms_grade import (
     GradeCreate,
@@ -53,6 +54,7 @@ __all__ = [
     "CourseCreate",
     "CourseRead",
     "CourseUpdate",
+    "MyCourseRead",
     "UnitCreate",
     "UnitRead",
     "UnitUpdate",

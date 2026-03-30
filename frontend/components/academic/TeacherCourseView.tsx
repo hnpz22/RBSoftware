@@ -7,6 +7,7 @@ import type { CourseDetail, UnitRead } from '@/lib/types'
 import { UnitsSidebar } from './UnitsSidebar'
 import { UnitDetailPanel } from './UnitDetailPanel'
 import { CreateUnitModal } from './CreateUnitModal'
+import { CourseStudentsTab } from './CourseStudentsTab'
 
 interface Props {
   course: CourseDetail
@@ -14,14 +15,22 @@ interface Props {
   reload: () => void
 }
 
+type CourseTab = 'content' | 'students'
+
 export function TeacherCourseView({ course, units, reload }: Props) {
   const router = useRouter()
+  const [courseTab, setCourseTab] = useState<CourseTab>('content')
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(
     units[0]?.public_id ?? null,
   )
   const [showCreateUnit, setShowCreateUnit] = useState(false)
 
   const selectedUnit = units.find((u) => u.public_id === selectedUnitId) ?? null
+
+  const courseTabs: { key: CourseTab; label: string }[] = [
+    { key: 'content', label: 'Contenido' },
+    { key: 'students', label: `Estudiantes (${course.students.length})` },
+  ]
 
   return (
     <>
@@ -37,6 +46,7 @@ export function TeacherCourseView({ course, units, reload }: Props) {
       )}
 
       <div className="flex h-full flex-col">
+        {/* Header */}
         <div className="shrink-0 border-b px-4 py-3">
           <button
             onClick={() => router.push('/academic/courses')}
@@ -52,19 +62,46 @@ export function TeacherCourseView({ course, units, reload }: Props) {
           </p>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          <UnitsSidebar
-            units={units}
-            selectedId={selectedUnitId}
-            onSelect={setSelectedUnitId}
-            onCreateUnit={() => setShowCreateUnit(true)}
-          />
-          <UnitDetailPanel
-            unit={selectedUnit}
-            course={course}
-            onUnitChanged={reload}
-          />
+        {/* Course-level tabs */}
+        <div className="flex shrink-0 border-b px-4">
+          {courseTabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setCourseTab(t.key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 ${
+                courseTab === t.key
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
+
+        {/* Content tab: sidebar + unit detail */}
+        {courseTab === 'content' && (
+          <div className="flex flex-1 overflow-hidden">
+            <UnitsSidebar
+              units={units}
+              selectedId={selectedUnitId}
+              onSelect={setSelectedUnitId}
+              onCreateUnit={() => setShowCreateUnit(true)}
+            />
+            <UnitDetailPanel
+              unit={selectedUnit}
+              course={course}
+              onUnitChanged={reload}
+            />
+          </div>
+        )}
+
+        {/* Students tab */}
+        {courseTab === 'students' && (
+          <div className="flex-1 overflow-y-auto p-4">
+            <CourseStudentsTab course={course} />
+          </div>
+        )}
       </div>
     </>
   )

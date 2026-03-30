@@ -6,6 +6,7 @@ import type {
   Grade,
   GradeWithCourses,
   MaterialRead,
+  MyCourseRead,
   School,
   StudentUnitContent,
   SubmissionWithStudent,
@@ -87,7 +88,7 @@ export function listUsers() {
 // ── Courses ──────────────────────────────────────────────────────────────────
 
 export function getMyCourses() {
-  return api.get<CourseRead[]>('/academic/my-courses')
+  return api.get<MyCourseRead[]>('/academic/my-courses')
 }
 
 export function getCourseDetail(courseId: string) {
@@ -166,7 +167,7 @@ export function downloadMaterial(materialId: string) {
   return api.get<{ url: string }>(`/academic/materials/${materialId}/download`)
 }
 
-export async function addMaterial(
+export function addMaterial(
   unitId: string,
   data: { title: string; type: string; content?: string | null },
   file?: File,
@@ -177,17 +178,10 @@ export async function addMaterial(
   if (data.content) form.append('content', data.content)
   if (file) form.append('file', file)
 
-  const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
-  const res = await fetch(`${BASE}/academic/units/${unitId}/materials`, {
-    method: 'POST',
-    credentials: 'include',
-    body: form,
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw { status: res.status, detail: body.detail ?? res.statusText }
-  }
-  return res.json() as Promise<MaterialRead>
+  return api.postForm<MaterialRead>(
+    `/academic/units/${unitId}/materials`,
+    form,
+  )
 }
 
 // ── Assignments ──────────────────────────────────────────────────────────────
@@ -242,7 +236,7 @@ export function getStudentCourseContent(courseId: string) {
   )
 }
 
-export async function submitAssignment(
+export function submitAssignment(
   assignmentId: string,
   content?: string | null,
   file?: File,
@@ -251,14 +245,5 @@ export async function submitAssignment(
   if (content) form.append('content', content)
   if (file) form.append('file', file)
 
-  const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
-  const res = await fetch(
-    `${BASE}/academic/assignments/${assignmentId}/submit`,
-    { method: 'POST', credentials: 'include', body: form },
-  )
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw { status: res.status, detail: body.detail ?? res.statusText }
-  }
-  return res.json()
+  return api.postForm(`/academic/assignments/${assignmentId}/submit`, form)
 }

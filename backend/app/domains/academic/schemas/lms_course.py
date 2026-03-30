@@ -24,6 +24,21 @@ class CourseRead(SQLModel):
     updated_at: datetime
 
 
+class MyCourseRead(SQLModel):
+    """Enriched course info for the /my-courses endpoint."""
+
+    public_id: UUID
+    name: str
+    description: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    grade_name: str
+    school_name: str
+    teacher_name: str
+    role: str  # "TEACHER" or "STUDENT"
+
+
 class CourseUpdate(SQLModel):
     name: str | None = None
     description: str | None = None

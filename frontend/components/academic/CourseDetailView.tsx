@@ -12,6 +12,7 @@ interface Props {
 export function CourseDetailView({ courseId }: Props) {
   const { course, units, loading, reload } = useCourseDetail(courseId)
   const user = useAuthStore((s) => s.user)
+  const { isAdmin, hasRole } = useAuthStore()
 
   if (loading) {
     return (
@@ -30,8 +31,9 @@ export function CourseDetailView({ courseId }: Props) {
   }
 
   const isTeacher = course.teacher.public_id === user?.public_id
+  const canManage = isTeacher || isAdmin() || hasRole('DIRECTOR')
 
-  if (isTeacher) {
+  if (canManage) {
     return (
       <TeacherCourseView course={course} units={units} reload={reload} />
     )

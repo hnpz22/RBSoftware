@@ -250,6 +250,19 @@ export interface CourseRead {
   updated_at: string
 }
 
+export interface MyCourseRead {
+  public_id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  grade_name: string
+  school_name: string
+  teacher_name: string
+  role: 'TEACHER' | 'STUDENT'
+}
+
 export interface CourseDetail {
   public_id: string
   name: string
