@@ -7,12 +7,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.database import get_session
-from app.domains.academic.repositories import (
-    CourseRepository,
-    GradeDirectorRepository,
-    GradeRepository,
-)
-from app.domains.rbac.repositories import UserRoleRepository
+from app.domains.academic.repositories import GradeRepository
 from app.domains.academic.schemas import (
     CourseCreate, CourseRead, GradeRead, GradeUpdate, GradeWithCourses,
 )
@@ -21,7 +16,6 @@ from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
-from app.domains.auth.schemas.user import UserRead
 
 router = APIRouter(prefix="/academic", tags=["academic – grades"])
 _svc = AcademicService()
@@ -55,23 +49,12 @@ def get_grade(
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
-    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(grade.id, current_user.id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
-    result = GradeRepository(session).get_with_courses(grade.id)
-    if result is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
-    grade_obj, courses, director = result
-    return GradeWithCourses(
-        public_id=grade_obj.public_id,
-        name=grade_obj.name,
-        description=grade_obj.description,
-        is_active=grade_obj.is_active,
-        created_at=grade_obj.created_at,
-        updated_at=grade_obj.updated_at,
-        director=UserRead.model_validate(director) if director else None,
-        courses=[CourseRead.model_validate(c) for c in courses],
-    )
+    try:
+        return _svc.get_grade_detail(session, grade.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
 
 @router.patch("/grades/{grade_id}", response_model=GradeRead)
@@ -81,14 +64,16 @@ def update_grade(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
-    repo = GradeRepository(session)
-    grade = repo.get_by_public_id(grade_id)
+    grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
-    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(grade.id, current_user.id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
-    return GradeRead.model_validate(repo.update(grade, data))
+    try:
+        updated = _svc.update_grade(session, grade.id, data, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    return GradeRead.model_validate(updated)
 
 
 @router.post("/grades/{grade_id}/director", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,16 +101,15 @@ def assign_director(
 def unassign_director(
     grade_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN")),
+    current_user: User = Depends(require_roles("ADMIN")),
 ):
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
-    director_repo = GradeDirectorRepository(session)
-    director = director_repo.get_active_director(grade.id)
-    if director is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No active director")
-    director_repo.unassign(grade.id, director.id)
+    try:
+        _svc.unassign_director(session, grade.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
 
 
 @router.get("/grades/{grade_id}/courses", response_model=list[CourseRead])
@@ -137,13 +121,11 @@ def list_courses(
     grade = GradeRepository(session).get_by_public_id(grade_id)
     if grade is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Grade not found")
-    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(grade.id, current_user.id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
-    return [
-        CourseRead.model_validate(c)
-        for c in CourseRepository(session).list_by_grade(grade.id)
-    ]
+    try:
+        courses = _svc.list_grade_courses(session, grade.id, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    return [CourseRead.model_validate(c) for c in courses]
 
 
 @router.post(

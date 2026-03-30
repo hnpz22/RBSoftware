@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlmodel import Session
 
@@ -24,19 +24,22 @@ from app.domains.academic.repositories import (
     SubmissionRepository,
     UnitRepository,
 )
+from app.domains.academic.schemas.composite import CourseDetail, GradeWithCourses
 from app.domains.academic.schemas.lms_assignment import (
     AssignmentCreate,
     AssignmentUpdate,
 )
-from app.domains.academic.schemas.lms_course import CourseCreate
-from app.domains.academic.schemas.lms_grade import GradeCreate
+from app.domains.academic.schemas.lms_course import CourseCreate, CourseRead, CourseUpdate, MyCourseRead
+from app.domains.academic.schemas.lms_grade import GradeCreate, GradeUpdate
 from app.domains.academic.schemas.lms_material import MaterialCreate
 from app.domains.academic.schemas.lms_submission import SubmissionUpdate
-from app.domains.academic.schemas.lms_unit import UnitCreate
+from app.domains.academic.schemas.lms_unit import UnitCreate, UnitRead, UnitUpdate
 from app.domains.academic.schemas.school import SchoolCreate
 from app.domains.audit.services import AuditService
+from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
-from app.domains.rbac.repositories import RoleRepository, UserRoleRepository
+from app.domains.auth.schemas.user import UserRead
+from app.domains.rbac.repositories import UserRoleRepository
 
 _audit = AuditService()
 
@@ -47,13 +50,8 @@ class AcademicService:
 
     @staticmethod
     def _is_admin(session: Session, user_id: int) -> bool:
-        user_roles = UserRoleRepository(session).list_by_user_id(user_id)
-        role_repo = RoleRepository(session)
-        for ur in user_roles:
-            role = role_repo.get_by_id(ur.role_id)
-            if role is not None and role.name.upper() == "ADMIN":
-                return True
-        return False
+        role_names = UserRoleRepository(session).get_role_names_for_user(user_id)
+        return "ADMIN" in role_names
 
     def _assert_admin_or_director(
         self, session: Session, grade_id: int, user_id: int
@@ -143,7 +141,139 @@ class AcademicService:
             payload={"director_user_id": user_id},
         )
 
+    def unassign_director(
+        self, session: Session, grade_id: int, requesting_user_id: int
+    ) -> None:
+        grade = GradeRepository(session).get_by_id(grade_id)
+        if grade is None:
+            raise LookupError("Grade not found")
+        director_repo = GradeDirectorRepository(session)
+        director = director_repo.get_active_director(grade.id)
+        if director is None:
+            raise LookupError("No active director")
+        director_repo.unassign(grade.id, director.id)
+        _audit.log(
+            session,
+            user_id=requesting_user_id,
+            action="academic.grade.director_unassigned",
+            resource_type="lms_grade",
+            resource_id=str(grade.id),
+        )
+
+    def get_grade_detail(
+        self, session: Session, grade_id: int, user_id: int
+    ) -> GradeWithCourses:
+        grade = GradeRepository(session).get_by_id(grade_id)
+        if grade is None:
+            raise LookupError("Grade not found")
+        self._assert_admin_or_director(session, grade.id, user_id)
+        result = GradeRepository(session).get_with_courses(grade.id)
+        if result is None:
+            raise LookupError("Grade not found")
+        grade_obj, courses, director = result
+        return GradeWithCourses(
+            public_id=grade_obj.public_id,
+            name=grade_obj.name,
+            description=grade_obj.description,
+            is_active=grade_obj.is_active,
+            created_at=grade_obj.created_at,
+            updated_at=grade_obj.updated_at,
+            director=UserRead.model_validate(director) if director else None,
+            courses=[CourseRead.model_validate(c) for c in courses],
+        )
+
+    def update_grade(
+        self, session: Session, grade_id: int, data: GradeUpdate, user_id: int
+    ) -> LmsGrade:
+        grade = GradeRepository(session).get_by_id(grade_id)
+        if grade is None:
+            raise LookupError("Grade not found")
+        self._assert_admin_or_director(session, grade.id, user_id)
+        return GradeRepository(session).update(grade, data)
+
+    def list_grade_courses(
+        self, session: Session, grade_id: int, user_id: int
+    ) -> list[LmsCourse]:
+        grade = GradeRepository(session).get_by_id(grade_id)
+        if grade is None:
+            raise LookupError("Grade not found")
+        self._assert_admin_or_director(session, grade.id, user_id)
+        return CourseRepository(session).list_by_grade(grade.id)
+
     # ── Courses ──────────────────────────────────────────────────────────────
+
+    def get_my_courses(
+        self, session: Session, user_id: int
+    ) -> list[MyCourseRead]:
+        teacher_courses = self.get_my_courses_as_teacher(session, user_id)
+        student_courses = self.get_my_courses_as_student(session, user_id)
+
+        teacher_ids = {c.id for c in teacher_courses}
+        all_courses = []
+        seen: set[int] = set()
+        for c in teacher_courses + student_courses:
+            if c.id not in seen:
+                seen.add(c.id)
+                all_courses.append(c)
+
+        if not all_courses:
+            return []
+
+        grade_ids = {c.grade_id for c in all_courses}
+        school_ids = {c.school_id for c in all_courses}
+        t_ids = {c.teacher_id for c in all_courses}
+
+        grade_repo = GradeRepository(session)
+        school_repo = SchoolRepository(session)
+        user_repo = UserRepository(session)
+
+        grades_map = {g.id: g for g in [grade_repo.get_by_id(gid) for gid in grade_ids] if g}
+        schools_map = {s.id: s for s in [school_repo.get_by_id(sid) for sid in school_ids] if s}
+        teachers_map = {t.id: t for t in [user_repo.get_by_id(tid) for tid in t_ids] if t}
+
+        result: list[MyCourseRead] = []
+        for c in all_courses:
+            grade = grades_map.get(c.grade_id)
+            school = schools_map.get(c.school_id)
+            teacher = teachers_map.get(c.teacher_id)
+            result.append(
+                MyCourseRead(
+                    public_id=c.public_id,
+                    name=c.name,
+                    description=c.description,
+                    is_active=c.is_active,
+                    created_at=c.created_at,
+                    updated_at=c.updated_at,
+                    grade_name=grade.name if grade else "",
+                    school_name=school.name if school else "",
+                    teacher_name=(
+                        f"{teacher.first_name} {teacher.last_name}" if teacher else ""
+                    ),
+                    role="TEACHER" if c.id in teacher_ids else "STUDENT",
+                )
+            )
+        return result
+
+    def get_course_detail(
+        self, session: Session, course_id: int
+    ) -> CourseDetail:
+        course = CourseRepository(session).get_by_id(course_id)
+        if course is None:
+            raise LookupError("Course not found")
+        teacher = UserRepository(session).get_by_id(course.teacher_id)
+        students = CourseStudentRepository(session).get_students(course.id)
+        units = UnitRepository(session).list_by_course(course.id)
+        return CourseDetail(
+            public_id=course.public_id,
+            name=course.name,
+            description=course.description,
+            is_active=course.is_active,
+            created_at=course.created_at,
+            updated_at=course.updated_at,
+            teacher=UserRead.model_validate(teacher),
+            students=[UserRead.model_validate(s) for s in students],
+            units=[UnitRead.model_validate(u) for u in units],
+        )
 
     def create_course(
         self,
@@ -178,6 +308,15 @@ class AcademicService:
         )
         return course
 
+    def update_course(
+        self, session: Session, course_id: int, data: CourseUpdate, user_id: int
+    ) -> LmsCourse:
+        course = CourseRepository(session).get_by_id(course_id)
+        if course is None:
+            raise LookupError("Course not found")
+        self._assert_admin_or_director(session, course.grade_id, user_id)
+        return CourseRepository(session).update(course, data)
+
     def assign_teacher(
         self,
         session: Session,
@@ -209,6 +348,15 @@ class AcademicService:
         )
         return course
 
+    def list_course_students(
+        self, session: Session, course_id: int, user_id: int
+    ) -> list[User]:
+        course = CourseRepository(session).get_by_id(course_id)
+        if course is None:
+            raise LookupError("Course not found")
+        self._assert_admin_or_director_or_teacher(session, course, user_id)
+        return CourseStudentRepository(session).get_students(course.id)
+
     def enroll_student(
         self,
         session: Session,
@@ -235,6 +383,28 @@ class AcademicService:
 
         cs_repo.enroll(course_id, user_id)
 
+    def unenroll_student(
+        self,
+        session: Session,
+        course_id: int,
+        user_id: int,
+        requesting_user_id: int,
+    ) -> None:
+        course = CourseRepository(session).get_by_id(course_id)
+        if course is None:
+            raise LookupError("Course not found")
+        self._assert_admin_or_director(session, course.grade_id, requesting_user_id)
+        if not CourseStudentRepository(session).unenroll(course_id, user_id):
+            raise LookupError("Student is not enrolled")
+        _audit.log(
+            session,
+            user_id=requesting_user_id,
+            action="academic.student.unenrolled",
+            resource_type="lms_course_student",
+            resource_id=str(user_id),
+            payload={"course_id": course_id},
+        )
+
     def transfer_student(
         self,
         session: Session,
@@ -255,9 +425,9 @@ class AcademicService:
             session, from_course.grade_id, requesting_user_id
         )
 
-        CourseStudentRepository(session).transfer(
-            student_id, from_course_id, to_course_id
-        )
+        cs_repo = CourseStudentRepository(session)
+        cs_repo.unenroll(from_course_id, student_id)
+        cs_repo.enroll(to_course_id, student_id, from_course_id=from_course_id)
 
         _audit.log(
             session,
@@ -285,6 +455,16 @@ class AcademicService:
             raise LookupError("Course not found")
         self._assert_admin_or_teacher(session, course, requesting_user_id)
         return UnitRepository(session).create(course_id, data)
+
+    def update_unit(
+        self, session: Session, unit_id: int, data: UnitUpdate, user_id: int
+    ) -> LmsUnit:
+        unit = UnitRepository(session).get_by_id(unit_id)
+        if unit is None:
+            raise LookupError("Unit not found")
+        course = CourseRepository(session).get_by_id(unit.course_id)
+        self._assert_admin_or_teacher(session, course, user_id)
+        return UnitRepository(session).update(unit, data)
 
     def add_material(
         self,
@@ -360,6 +540,17 @@ class AcademicService:
         self._assert_admin_or_teacher(session, course, requesting_user_id)
         return AssignmentRepository(session).create(unit_id, data)
 
+    def update_assignment(
+        self, session: Session, assignment_id: int, data: AssignmentUpdate, user_id: int
+    ) -> LmsAssignment:
+        assignment = AssignmentRepository(session).get_by_id(assignment_id)
+        if assignment is None:
+            raise LookupError("Assignment not found")
+        unit = UnitRepository(session).get_by_id(assignment.unit_id)
+        course = CourseRepository(session).get_by_id(unit.course_id)
+        self._assert_admin_or_teacher(session, course, user_id)
+        return AssignmentRepository(session).update(assignment, data)
+
     def publish_assignment(
         self,
         session: Session,
@@ -375,6 +566,17 @@ class AcademicService:
         course = CourseRepository(session).get_by_id(unit.course_id)
         self._assert_admin_or_teacher(session, course, requesting_user_id)
         return repo.update(assignment, AssignmentUpdate(is_published=publish))
+
+    def get_assignment_submissions(
+        self, session: Session, assignment_id: int, user_id: int
+    ) -> list[tuple[LmsSubmission, User]]:
+        assignment = AssignmentRepository(session).get_by_id(assignment_id)
+        if assignment is None:
+            raise LookupError("Assignment not found")
+        unit = UnitRepository(session).get_by_id(assignment.unit_id)
+        course = CourseRepository(session).get_by_id(unit.course_id)
+        self._assert_admin_or_teacher(session, course, user_id)
+        return SubmissionRepository(session).get_by_assignment(assignment.id)
 
     # ── Submissions ──────────────────────────────────────────────────────────
 
@@ -400,6 +602,12 @@ class AcademicService:
 
         if not CourseStudentRepository(session).is_enrolled(course.id, student_id):
             raise PermissionError("Student is not enrolled in this course")
+
+        existing = SubmissionRepository(session).get_by_student_and_assignment(
+            student_id, assignment_id
+        )
+        if existing and existing.status == SubmissionStatus.GRADED:
+            raise ValueError("Cannot modify a graded submission")
 
         file_key = None
         if file_bytes is not None and file_name is not None:
@@ -529,7 +737,6 @@ class AcademicService:
                 "User must be admin, teacher, director, or enrolled student"
             )
 
-        # Teacher/admin see everything (drafts included); others only published
         published_only = not (is_admin or is_teacher)
 
         units = UnitRepository(session).list_by_course(

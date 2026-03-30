@@ -8,15 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session
 
 from app.core.database import get_session
-from app.domains.academic.repositories import (
-    CourseRepository,
-    CourseStudentRepository,
-    GradeDirectorRepository,
-    GradeRepository,
-    SchoolRepository,
-    UnitRepository,
-)
-from app.domains.rbac.repositories import UserRoleRepository
+from app.domains.academic.repositories import CourseRepository
 from app.domains.academic.schemas import (
     AssignmentRead, CourseDetail, CourseRead, CourseUpdate,
     MaterialRead, MyCourseRead, SubmissionRead, UnitRead,
@@ -69,40 +61,7 @@ def my_courses(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    teacher_courses = _svc.get_my_courses_as_teacher(session, current_user.id)
-    student_courses = _svc.get_my_courses_as_student(session, current_user.id)
-
-    teacher_ids = {c.id for c in teacher_courses}
-    seen: set[int] = set()
-    result: list[MyCourseRead] = []
-
-    for c in teacher_courses + student_courses:
-        if c.id in seen:
-            continue
-        seen.add(c.id)
-
-        grade = GradeRepository(session).get_by_id(c.grade_id)
-        school = SchoolRepository(session).get_by_id(c.school_id)
-        teacher = UserRepository(session).get_by_id(c.teacher_id)
-
-        result.append(
-            MyCourseRead(
-                public_id=c.public_id,
-                name=c.name,
-                description=c.description,
-                is_active=c.is_active,
-                created_at=c.created_at,
-                updated_at=c.updated_at,
-                grade_name=grade.name if grade else "",
-                school_name=school.name if school else "",
-                teacher_name=(
-                    f"{teacher.first_name} {teacher.last_name}" if teacher else ""
-                ),
-                role="TEACHER" if c.id in teacher_ids else "STUDENT",
-            )
-        )
-
-    return result
+    return _svc.get_my_courses(session, current_user.id)
 
 
 @router.get("/courses/{course_id}", response_model=CourseDetail)
@@ -114,20 +73,10 @@ def get_course(
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
-    teacher = UserRepository(session).get_by_id(course.teacher_id)
-    students = CourseStudentRepository(session).get_students(course.id)
-    units = UnitRepository(session).list_by_course(course.id)
-    return CourseDetail(
-        public_id=course.public_id,
-        name=course.name,
-        description=course.description,
-        is_active=course.is_active,
-        created_at=course.created_at,
-        updated_at=course.updated_at,
-        teacher=UserRead.model_validate(teacher),
-        students=[UserRead.model_validate(s) for s in students],
-        units=[UnitRead.model_validate(u) for u in units],
-    )
+    try:
+        return _svc.get_course_detail(session, course.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
 
 
 @router.patch("/courses/{course_id}", response_model=CourseRead)
@@ -137,14 +86,14 @@ def update_course(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
-    repo = CourseRepository(session)
-    course = repo.get_by_public_id(course_id)
+    course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
-    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" not in role_names and not GradeDirectorRepository(session).is_director_of_grade(course.grade_id, current_user.id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the director of this grade")
-    return CourseRead.model_validate(repo.update(course, data))
+    try:
+        updated = _svc.update_course(session, course.id, data, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    return CourseRead.model_validate(updated)
 
 
 @router.post("/courses/{course_id}/teacher", status_code=status.HTTP_204_NO_CONTENT)
@@ -177,15 +126,11 @@ def list_students(
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
-    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" not in role_names:
-        is_director = GradeDirectorRepository(session).is_director_of_grade(course.grade_id, current_user.id)
-        if not is_director and course.teacher_id != current_user.id:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized for this course")
-    return [
-        UserRead.model_validate(s)
-        for s in CourseStudentRepository(session).get_students(course.id)
-    ]
+    try:
+        students = _svc.list_course_students(session, course.id, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    return [UserRead.model_validate(s) for s in students]
 
 
 @router.post(
@@ -220,7 +165,7 @@ def unenroll_student(
     course_id: UUID,
     user_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:
@@ -228,8 +173,12 @@ def unenroll_student(
     user = UserRepository(session).get_by_public_id(user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    if not CourseStudentRepository(session).unenroll(course.id, user.id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Student is not enrolled")
+    try:
+        _svc.unenroll_student(session, course.id, user.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
 
 @router.get("/courses/{course_id}/content", response_model=list[_UnitStudentView])

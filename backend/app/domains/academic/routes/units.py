@@ -12,7 +12,6 @@ from app.domains.academic.services import AcademicService
 from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
-from app.domains.rbac.repositories import UserRoleRepository
 
 router = APIRouter(prefix="/academic", tags=["academic – units"])
 _svc = AcademicService()
@@ -61,15 +60,14 @@ def update_unit(
     session: Session = Depends(get_session),
     current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
 ):
-    repo = UnitRepository(session)
-    unit = repo.get_by_public_id(unit_id)
+    unit = UnitRepository(session).get_by_public_id(unit_id)
     if unit is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unit not found")
-    course = CourseRepository(session).get_by_id(unit.course_id)
-    role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" not in role_names and course.teacher_id != current_user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the teacher")
-    return UnitRead.model_validate(repo.update(unit, data))
+    try:
+        updated = _svc.update_unit(session, unit.id, data, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    return UnitRead.model_validate(updated)
 
 
 @router.post("/units/{unit_id}/publish", status_code=status.HTTP_204_NO_CONTENT)

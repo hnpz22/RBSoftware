@@ -33,8 +33,6 @@ class SubmissionRepository:
     ) -> LmsSubmission:
         existing = self.get_by_student_and_assignment(student_id, assignment_id)
         if existing is not None:
-            if existing.status == SubmissionStatus.GRADED:
-                raise ValueError("Cannot modify a graded submission")
             if content is not None:
                 existing.content = content
             if file_key is not None:

@@ -46,12 +46,6 @@ class CourseStudentRepository:
         self.session.commit()
         return True
 
-    def transfer(
-        self, student_id: int, from_course_id: int, to_course_id: int
-    ) -> LmsCourseStudent:
-        self.unenroll(from_course_id, student_id)
-        return self.enroll(to_course_id, student_id, from_course_id=from_course_id)
-
     def get_students(self, course_id: int) -> list[User]:
         stmt = (
             select(User)
