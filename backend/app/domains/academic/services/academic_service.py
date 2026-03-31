@@ -537,24 +537,19 @@ class AcademicService:
     ) -> dict[str, str]:
         material = MaterialRepository(session).get_by_id(material_id)
         if material is None:
-            raise LookupError("Material not found")
+            raise LookupError("Material no encontrado")
         if not material.file_key:
-            raise ValueError("Material has no file")
+            raise ValueError("Este material no tiene archivo")
 
         unit = UnitRepository(session).get_by_id(material.unit_id)
         course = CourseRepository(session).get_by_id(unit.course_id)
 
         is_admin = self._is_admin(session, requesting_user_id)
         is_teacher = course.teacher_id == requesting_user_id
-        is_director = GradeDirectorRepository(session).is_director_of_grade(
-            course.grade_id, requesting_user_id
-        )
-        is_student = CourseStudentRepository(session).is_enrolled(
-            course.id, requesting_user_id
-        )
 
-        if not (is_admin or is_teacher or is_director or is_student):
-            raise PermissionError("User does not have access to this course")
+        if not is_admin and not is_teacher:
+            if not material.is_published:
+                raise PermissionError("Material no disponible")
 
         url = storage_service.generate_presigned_url(material.file_key, inline=True)
         return {"url": url}
