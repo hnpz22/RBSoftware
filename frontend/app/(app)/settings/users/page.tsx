@@ -35,15 +35,25 @@ function CreateUserModal({
   onCreated: () => void
 }) {
   const [form, setForm] = useState<CreateUserForm>(EMPTY_FORM)
+  const [roleId, setRoleId] = useState('')
+  const [roles, setRoles] = useState<Role[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    api.get<Role[]>('/rbac/roles').then(setRoles)
+  }, [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!roleId) {
+      setError('Selecciona un rol para el usuario')
+      return
+    }
     setError(null)
     setSaving(true)
     try {
-      await api.post<User>('/auth/users', {
+      const newUser = await api.post<User>('/auth/users', {
         email: form.email.trim(),
         password: form.password,
         first_name: form.first_name.trim(),
@@ -51,6 +61,7 @@ function CreateUserModal({
         phone: form.phone.trim() || null,
         position: form.position.trim() || null,
       })
+      await api.post(`/rbac/users/${newUser.public_id}/roles/${roleId}`)
       onCreated()
     } catch (err: any) {
       setError(err?.detail ?? 'Error al crear el usuario')
@@ -104,6 +115,22 @@ function CreateUserModal({
               <Input placeholder="ej. Operario de bodega" value={form.position}
                 onChange={(e) => setForm({ ...form, position: e.target.value })} />
             </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Rol</label>
+            <select
+              required
+              value={roleId}
+              onChange={(e) => setRoleId(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Seleccionar rol…</option>
+              {roles.map((role) => (
+                <option key={role.public_id} value={role.public_id}>
+                  {role.name}{role.description ? ` — ${role.description}` : ''}
+                </option>
+              ))}
+            </select>
           </div>
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
@@ -473,7 +500,6 @@ function UserPanel({
 export default function SettingsUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
-  const [userRolesMap, setUserRolesMap] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -487,17 +513,6 @@ export default function SettingsUsersPage() {
       ])
       setUsers(usersData)
       setAllRoles(rolesData)
-
-      // Batch-fetch roles for each user to populate the table column
-      const roleEntries = await Promise.all(
-        usersData.map((u) =>
-          api
-            .get<Role[]>(`/rbac/users/${u.public_id}/roles`)
-            .then((roles) => [u.public_id, roles.map((r) => r.name)] as const)
-            .catch(() => [u.public_id, []] as const),
-        ),
-      )
-      setUserRolesMap(Object.fromEntries(roleEntries))
     } finally {
       setLoading(false)
     }
@@ -510,6 +525,7 @@ export default function SettingsUsersPage() {
       setUsers((prev) => prev.map((u) => (u.public_id === updated.public_id ? updated : u)))
       setSelectedUser(updated)
     }
+    load()
   }
 
   function handleCreated() {
@@ -587,11 +603,11 @@ export default function SettingsUsersPage() {
                       {u.position ?? <span className="italic text-xs">Sin cargo</span>}
                     </td>
                     <td className="px-4 py-3">
-                      {(userRolesMap[u.public_id] ?? []).length === 0 ? (
+                      {(u.roles ?? []).length === 0 ? (
                         <span className="italic text-xs text-muted-foreground">Sin roles</span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
-                          {(userRolesMap[u.public_id] ?? []).map((name) => (
+                          {(u.roles ?? []).map((name) => (
                             <span
                               key={name}
                               className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium"
