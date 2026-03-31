@@ -527,6 +527,56 @@ class AcademicService:
             return repo.publish(material)
         return repo.unpublish(material)
 
+    # ── Material access ─────────────────────────────────────────────────────
+
+    def get_material_view_url(
+        self,
+        session: Session,
+        material_id: int,
+        requesting_user_id: int,
+    ) -> dict[str, str]:
+        material = MaterialRepository(session).get_by_id(material_id)
+        if material is None:
+            raise LookupError("Material not found")
+        if not material.file_key:
+            raise ValueError("Material has no file")
+
+        unit = UnitRepository(session).get_by_id(material.unit_id)
+        course = CourseRepository(session).get_by_id(unit.course_id)
+
+        is_admin = self._is_admin(session, requesting_user_id)
+        is_teacher = course.teacher_id == requesting_user_id
+        is_director = GradeDirectorRepository(session).is_director_of_grade(
+            course.grade_id, requesting_user_id
+        )
+        is_student = CourseStudentRepository(session).is_enrolled(
+            course.id, requesting_user_id
+        )
+
+        if not (is_admin or is_teacher or is_director or is_student):
+            raise PermissionError("User does not have access to this course")
+
+        url = storage_service.generate_presigned_url(material.file_key, inline=True)
+        return {"url": url}
+
+    def get_material_download_url(
+        self,
+        session: Session,
+        material_id: int,
+        requesting_user_id: int,
+    ) -> dict[str, str]:
+        material = MaterialRepository(session).get_by_id(material_id)
+        if material is None:
+            raise LookupError("Material not found")
+        if not material.file_key:
+            raise ValueError("Material has no file")
+
+        if not self._is_admin(session, requesting_user_id):
+            raise PermissionError("Solo administradores pueden descargar archivos")
+
+        url = storage_service.generate_presigned_url(material.file_key, inline=False)
+        return {"url": url}
+
     def publish_unit(
         self,
         session: Session,

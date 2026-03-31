@@ -116,16 +116,39 @@ def unpublish_material(
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
 
-@router.get("/materials/{material_id}/download")
-def download_material(
+@router.get("/materials/{material_id}/view")
+def view_material(
     material_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     material = MaterialRepository(session).get_by_public_id(material_id)
     if material is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Material not found")
-    if not material.file_key:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Material has no file")
-    url = storage_service.generate_presigned_url(material.file_key)
-    return {"url": url}
+    try:
+        return _svc.get_material_view_url(session, material.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
+@router.get("/materials/{material_id}/download")
+def download_material(
+    material_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN")),
+):
+    material = MaterialRepository(session).get_by_public_id(material_id)
+    if material is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Material not found")
+    try:
+        return _svc.get_material_download_url(session, material.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))

@@ -37,10 +37,18 @@ class StorageService:
         self,
         key: str,
         expires_seconds: int = 3600,
+        inline: bool = True,
     ) -> str:
+        disposition = (
+            "inline" if inline
+            else f'attachment; filename="{key.split("/")[-1]}"'
+        )
         url = self.client.presigned_get_object(
             self.bucket, key,
             expires=timedelta(seconds=expires_seconds),
+            response_headers={
+                "response-content-disposition": disposition,
+            },
         )
         url = url.replace(
             f"http://{settings.minio_endpoint}",

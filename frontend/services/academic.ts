@@ -171,6 +171,10 @@ export function unpublishMaterial(materialId: string) {
   return api.delete(`/academic/materials/${materialId}/publish`)
 }
 
+export function viewMaterial(materialId: string) {
+  return api.get<{ url: string }>(`/academic/materials/${materialId}/view`)
+}
+
 export function downloadMaterial(materialId: string) {
   return api.get<{ url: string }>(`/academic/materials/${materialId}/download`)
 }

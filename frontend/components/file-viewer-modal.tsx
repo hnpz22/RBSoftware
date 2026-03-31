@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Download, ExternalLink, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
+import { useAuthStore } from '@/lib/store'
 
 interface Props {
   isOpen: boolean
@@ -17,6 +18,7 @@ export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileTyp
   const [url, setUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isAdmin = useAuthStore((s) => s.isAdmin)
 
   useEffect(() => {
     if (!isOpen || !materialId) {
@@ -27,11 +29,19 @@ export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileTyp
     setLoading(true)
     setError(null)
     academicService
-      .downloadMaterial(materialId)
+      .viewMaterial(materialId)
       .then((res) => setUrl(res.url))
       .catch((err: any) => setError(err?.detail ?? 'Error al obtener el archivo'))
       .finally(() => setLoading(false))
   }, [isOpen, materialId])
+
+  const handleDownload = () => {
+    if (!materialId) return
+    academicService
+      .downloadMaterial(materialId)
+      .then((res) => window.open(res.url, '_blank'))
+      .catch((err: any) => setError(err?.detail ?? 'Error al descargar el archivo'))
+  }
 
   if (!isOpen) return null
 
@@ -66,11 +76,21 @@ export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileTyp
           )}
 
           {!loading && !error && url && fileType === 'PDF' && (
-            <iframe src={url} className="h-full w-full border-0" />
+            <iframe
+              src={`${url}#toolbar=0&navpanes=0&scrollbar=1`}
+              className="h-full w-full border-0"
+              title={fileName}
+            />
           )}
 
           {!loading && !error && url && fileType === 'IMAGE' && (
-            <img src={url} alt={fileName} className="max-h-full max-w-full object-contain mx-auto" />
+            <img
+              src={url}
+              alt={fileName}
+              className="max-h-full max-w-full object-contain mx-auto"
+              onContextMenu={(e) => e.preventDefault()}
+              draggable={false}
+            />
           )}
         </div>
 
@@ -84,8 +104,8 @@ export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileTyp
             )}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            {!loading && url && (
-              <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank')}>
+            {!loading && url && isAdmin() && (
+              <Button size="sm" variant="outline" onClick={handleDownload}>
                 <Download size={14} />
                 <span className="ml-1">Descargar</span>
               </Button>
