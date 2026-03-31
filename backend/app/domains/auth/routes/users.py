@@ -45,9 +45,8 @@ class ChangePasswordRequest(BaseModel):
 def list_users(
     session: Session = Depends(get_session),
     _: User = Depends(get_current_user),
-) -> list[UserRead]:
-    users = _svc.list_users(session)
-    return [UserRead.model_validate(u) for u in users]
+):
+    return _svc.list_users(session)
 
 
 @router.patch("/{user_id}", response_model=UserRead)

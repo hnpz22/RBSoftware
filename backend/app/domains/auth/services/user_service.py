@@ -7,7 +7,8 @@ from sqlmodel import Session
 from app.core.security import hash_password, verify_password
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
-from app.domains.auth.schemas import UserCreate, UserUpdate
+from app.domains.auth.schemas import UserCreate, UserRead, UserUpdate
+from app.domains.rbac.repositories import UserRoleRepository
 from app.domains.auth.services.refresh_token_service import RefreshTokenService
 
 
@@ -49,8 +50,16 @@ class UserService:
     def get_by_public_id(self, session: Session, public_id: UUID) -> User | None:
         return UserRepository(session).get_by_public_id(public_id)
 
-    def list_users(self, session: Session) -> list[User]:
-        return UserRepository(session).list()
+    def list_users(self, session: Session) -> list[UserRead]:
+        users = UserRepository(session).list()
+        role_repo = UserRoleRepository(session)
+        result = []
+        for user in users:
+            role_names = role_repo.get_role_names_for_user(user.id)
+            result.append(
+                UserRead.model_validate(user).model_copy(update={"roles": role_names})
+            )
+        return result
 
     def update_user(
         self,
