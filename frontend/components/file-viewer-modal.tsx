@@ -9,31 +9,47 @@ import { useAuthStore } from '@/lib/store'
 interface Props {
   isOpen: boolean
   onClose: () => void
-  materialId: string | null
+  materialId?: string | null
+  submissionId?: string | null
+  localUrl?: string | null
   fileName: string
   fileType: 'PDF' | 'IMAGE'
 }
 
-export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileType }: Props) {
+export function FileViewerModal({ isOpen, onClose, materialId, submissionId, localUrl, fileName, fileType }: Props) {
   const [url, setUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isAdmin = useAuthStore((s) => s.isAdmin)
 
   useEffect(() => {
-    if (!isOpen || !materialId) {
+    if (!isOpen) {
       setUrl(null)
       setError(null)
       return
     }
+
+    if (localUrl) {
+      setUrl(localUrl)
+      setLoading(false)
+      return
+    }
+
+    const fetchUrl = submissionId
+      ? academicService.viewSubmission(submissionId).then((res) => res.url)
+      : materialId
+        ? academicService.viewMaterial(materialId).then((res) => res.url)
+        : null
+
+    if (!fetchUrl) return
+
     setLoading(true)
     setError(null)
-    academicService
-      .viewMaterial(materialId)
-      .then((res) => setUrl(res.url))
+    fetchUrl
+      .then((u) => setUrl(u))
       .catch((err: any) => setError(err?.detail ?? 'Error al obtener el archivo'))
       .finally(() => setLoading(false))
-  }, [isOpen, materialId])
+  }, [isOpen, localUrl, submissionId, materialId])
 
   const handleDownload = () => {
     if (!materialId) return
@@ -96,7 +112,7 @@ export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileTyp
 
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-3">
           <div className="md:hidden">
-            {!loading && url && fileType === 'PDF' && (
+            {!loading && url && fileType === 'PDF' && !localUrl && !submissionId && (
               <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank')}>
                 <ExternalLink size={14} />
                 <span className="ml-1">Abrir en nueva pestaña</span>
@@ -104,7 +120,7 @@ export function FileViewerModal({ isOpen, onClose, materialId, fileName, fileTyp
             )}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            {!loading && url && isAdmin() && (
+            {!loading && url && !localUrl && !submissionId && isAdmin() && (
               <Button size="sm" variant="outline" onClick={handleDownload}>
                 <Download size={14} />
                 <span className="ml-1">Descargar</span>

@@ -738,6 +738,57 @@ class AcademicService:
         )
         return submission
 
+    # ── Submission access ───────────────────────────────────────────────────
+
+    def get_submission_view_url(
+        self,
+        session: Session,
+        submission_id: int,
+        requesting_user_id: int,
+    ) -> dict[str, str]:
+        submission = SubmissionRepository(session).get_by_id(submission_id)
+        if submission is None:
+            raise LookupError("Entrega no encontrada")
+
+        is_owner = submission.student_id == requesting_user_id
+        is_admin = self._is_admin(session, requesting_user_id)
+
+        if not is_owner and not is_admin:
+            assignment = AssignmentRepository(session).get_by_id(submission.assignment_id)
+            unit = UnitRepository(session).get_by_id(assignment.unit_id)
+            course = CourseRepository(session).get_by_id(unit.course_id)
+            if course.teacher_id != requesting_user_id:
+                raise PermissionError("Sin acceso a esta entrega")
+
+        if not submission.file_key:
+            raise ValueError("Esta entrega no tiene archivo adjunto")
+
+        url = storage_service.generate_presigned_url(
+            submission.file_key, expires_seconds=3600, inline=True
+        )
+        return {"url": url, "file_name": submission.file_name}
+
+    def get_submission_download_url(
+        self,
+        session: Session,
+        submission_id: int,
+        requesting_user_id: int,
+    ) -> dict[str, str]:
+        submission = SubmissionRepository(session).get_by_id(submission_id)
+        if submission is None:
+            raise LookupError("Entrega no encontrada")
+
+        if not self._is_admin(session, requesting_user_id):
+            raise PermissionError("Solo administradores pueden descargar entregas")
+
+        if not submission.file_key:
+            raise ValueError("Esta entrega no tiene archivo adjunto")
+
+        url = storage_service.generate_presigned_url(
+            submission.file_key, expires_seconds=3600, inline=False
+        )
+        return {"url": url, "file_name": submission.file_name}
+
     # ── Queries ──────────────────────────────────────────────────────────────
 
     def get_my_courses_as_teacher(

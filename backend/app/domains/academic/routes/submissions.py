@@ -86,19 +86,42 @@ def get_my_submission(
     return SubmissionRead.model_validate(submission)
 
 
-@router.get("/submissions/{submission_id}/download")
-def download_submission(
+@router.get("/submissions/{submission_id}/view")
+def view_submission(
     submission_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TEACHER")),
+    current_user: User = Depends(get_current_user),
 ):
     submission = SubmissionRepository(session).get_by_public_id(submission_id)
     if submission is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Submission not found")
-    if not submission.file_key:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Submission has no file")
-    url = storage_service.generate_presigned_url(submission.file_key)
-    return {"url": url}
+    try:
+        return _svc.get_submission_view_url(session, submission.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
+@router.get("/submissions/{submission_id}/download")
+def download_submission(
+    submission_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN")),
+):
+    submission = SubmissionRepository(session).get_by_public_id(submission_id)
+    if submission is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Submission not found")
+    try:
+        return _svc.get_submission_download_url(session, submission.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
 
 @router.post(

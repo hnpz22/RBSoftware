@@ -233,6 +233,10 @@ export function getAssignmentSubmissions(assignmentId: string) {
 
 // ── Grading ──────────────────────────────────────────────────────────────────
 
+export function viewSubmission(submissionId: string) {
+  return api.get<{ url: string; file_name: string }>(`/academic/submissions/${submissionId}/view`)
+}
+
 export function downloadSubmission(submissionId: string) {
   return api.get<{ url: string }>(`/academic/submissions/${submissionId}/download`)
 }
