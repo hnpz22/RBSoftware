@@ -24,6 +24,7 @@ class GradeWithCourses(SQLModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    school_public_id: UUID | None = None
     courses: list[CourseRead] = []
     director: UserRead | None = None
 

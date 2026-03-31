@@ -9,11 +9,12 @@ import type { User } from '@/lib/types'
 
 interface Props {
   gradeId: string
+  schoolId: string
   onClose: () => void
   onCreated: () => void
 }
 
-export function CreateCourseModal({ gradeId, onClose, onCreated }: Props) {
+export function CreateCourseModal({ gradeId, schoolId, onClose, onCreated }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [teacherId, setTeacherId] = useState('')
@@ -22,10 +23,8 @@ export function CreateCourseModal({ gradeId, onClose, onCreated }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    academicService.listUsers().then((all) => {
-      setUsers(all.filter((u) => u.roles.includes('TEACHER')))
-    })
-  }, [])
+    academicService.listSchoolTeachers(schoolId).then(setUsers)
+  }, [schoolId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

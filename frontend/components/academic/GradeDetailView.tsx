@@ -57,9 +57,10 @@ export function GradeDetailView({ gradeId }: Props) {
 
   return (
     <>
-      {showCreateCourse && grade && (
+      {showCreateCourse && grade && grade.school_public_id && (
         <CreateCourseModal
           gradeId={grade.public_id}
+          schoolId={grade.school_public_id}
           onClose={() => setShowCreateCourse(false)}
           onCreated={() => {
             setShowCreateCourse(false)

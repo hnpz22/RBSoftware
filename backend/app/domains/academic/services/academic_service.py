@@ -21,6 +21,7 @@ from app.domains.academic.repositories import (
     GradeRepository,
     MaterialRepository,
     SchoolRepository,
+    SchoolTeacherRepository,
     SubmissionRepository,
     UnitRepository,
 )
@@ -90,6 +91,93 @@ class AcademicService:
 
     def create_school(self, session: Session, data: SchoolCreate) -> School:
         return SchoolRepository(session).create(data)
+
+    def add_teacher_to_school(
+        self,
+        session: Session,
+        school_id: int,
+        user_id: int,
+        requesting_user_id: int,
+    ) -> None:
+        if not self._is_admin(session, requesting_user_id):
+            raise PermissionError("Solo administradores pueden asignar docentes")
+
+        school = SchoolRepository(session).get_by_id(school_id)
+        if school is None:
+            raise LookupError("Colegio no encontrado")
+
+        user = UserRepository(session).get_by_id(user_id)
+        if user is None:
+            raise LookupError("Usuario no encontrado")
+
+        role_names = UserRoleRepository(session).get_role_names_for_user(user.id)
+        if "TEACHER" not in role_names:
+            raise ValueError("El usuario no tiene rol TEACHER")
+
+        SchoolTeacherRepository(session).add(school_id, user_id)
+
+        _audit.log(
+            session,
+            user_id=requesting_user_id,
+            action="academic.school.teacher_added",
+            resource_type="school",
+            resource_id=str(school.id),
+            payload={"teacher_user_id": user_id},
+        )
+
+    def remove_teacher_from_school(
+        self,
+        session: Session,
+        school_id: int,
+        user_id: int,
+        requesting_user_id: int,
+    ) -> None:
+        if not self._is_admin(session, requesting_user_id):
+            raise PermissionError("Solo administradores pueden remover docentes")
+
+        active_courses = [
+            c for c in CourseRepository(session).list_by_school(school_id)
+            if c.teacher_id == user_id and c.is_active
+        ]
+        if active_courses:
+            raise ValueError("El docente tiene cursos activos en este colegio")
+
+        SchoolTeacherRepository(session).remove(school_id, user_id)
+
+        _audit.log(
+            session,
+            user_id=requesting_user_id,
+            action="academic.school.teacher_removed",
+            resource_type="school",
+            resource_id=str(school_id),
+            payload={"teacher_user_id": user_id},
+        )
+
+    def get_teachers_for_school(
+        self,
+        session: Session,
+        school_id: int,
+        requesting_user_id: int,
+    ) -> list[UserRead]:
+        if not self._is_admin(session, requesting_user_id):
+            grades = GradeDirectorRepository(session).get_grades_for_director(
+                requesting_user_id
+            )
+            school_ids = {g.school_id for g in grades}
+            if school_id not in school_ids:
+                raise PermissionError(
+                    "Solo administradores o directores del colegio pueden ver docentes"
+                )
+
+        teachers = SchoolTeacherRepository(session).list_teachers(school_id)
+        role_repo = UserRoleRepository(session)
+        result = []
+        for user in teachers:
+            role_names = role_repo.get_role_names_for_user(user.id)
+            result.append(
+                UserRead.model_validate(user).model_copy(update={"roles": role_names})
+            )
+        return result
 
     # ── Grades ───────────────────────────────────────────────────────────────
 
@@ -171,6 +259,7 @@ class AcademicService:
         if result is None:
             raise LookupError("Grade not found")
         grade_obj, courses, director = result
+        school = SchoolRepository(session).get_by_id(grade_obj.school_id)
         return GradeWithCourses(
             public_id=grade_obj.public_id,
             name=grade_obj.name,
@@ -178,6 +267,7 @@ class AcademicService:
             is_active=grade_obj.is_active,
             created_at=grade_obj.created_at,
             updated_at=grade_obj.updated_at,
+            school_public_id=school.public_id if school else None,
             director=UserRead.model_validate(director) if director else None,
             courses=[CourseRead.model_validate(c) for c in courses],
         )

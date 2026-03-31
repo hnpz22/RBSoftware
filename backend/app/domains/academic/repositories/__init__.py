@@ -7,11 +7,13 @@ from app.domains.academic.repositories.grade_director_repository import GradeDir
 from app.domains.academic.repositories.grade_repository import GradeRepository
 from app.domains.academic.repositories.material_repository import MaterialRepository
 from app.domains.academic.repositories.school_repository import SchoolRepository
+from app.domains.academic.repositories.school_teacher_repository import SchoolTeacherRepository
 from app.domains.academic.repositories.submission_repository import SubmissionRepository
 from app.domains.academic.repositories.unit_repository import UnitRepository
 
 __all__ = [
     "SchoolRepository",
+    "SchoolTeacherRepository",
     "GradeRepository",
     "GradeDirectorRepository",
     "CourseRepository",

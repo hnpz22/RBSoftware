@@ -85,6 +85,20 @@ export function listUsers() {
   return api.get<User[]>('/auth/users')
 }
 
+// ── School Teachers ──────────────────────────────────────────────────────────
+
+export function listSchoolTeachers(schoolId: string) {
+  return api.get<User[]>(`/academic/schools/${schoolId}/teachers`)
+}
+
+export function addSchoolTeacher(schoolId: string, userId: string) {
+  return api.post(`/academic/schools/${schoolId}/teachers`, { user_id: userId })
+}
+
+export function removeSchoolTeacher(schoolId: string, userId: string) {
+  return api.delete(`/academic/schools/${schoolId}/teachers/${userId}`)
+}
+
 // ── Courses ──────────────────────────────────────────────────────────────────
 
 export function getMyCourses() {

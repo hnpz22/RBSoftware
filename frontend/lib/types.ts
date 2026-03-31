@@ -237,6 +237,7 @@ export interface Grade {
 }
 
 export interface GradeWithCourses extends Grade {
+  school_public_id: string | null
   courses: CourseRead[]
   director: User | null
 }
