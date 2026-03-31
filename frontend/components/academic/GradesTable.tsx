@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { GradeWithCourses } from '@/lib/types'
 
@@ -40,13 +41,14 @@ export function GradesTable({
           {grades.map((g) => (
             <tr
               key={g.public_id}
-              className="cursor-pointer border-b last:border-0 hover:bg-muted/30"
+              className="cursor-pointer border-b last:border-0 hover:bg-muted/30 transition-colors"
+              onClick={() => onSelectGrade(g.public_id)}
             >
-              <td
-                className="px-4 py-3 font-medium"
-                onClick={() => onSelectGrade(g.public_id)}
-              >
-                {g.name}
+              <td className="px-4 py-3 font-medium text-primary">
+                <span className="flex items-center gap-1">
+                  {g.name}
+                  <ChevronRight size={14} className="text-muted-foreground" />
+                </span>
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {g.director ? (
