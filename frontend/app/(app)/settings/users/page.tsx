@@ -5,7 +5,7 @@ import { Plus, RefreshCw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import type { Role, User } from '@/lib/types'
+import type { Grade, Role, School, User } from '@/lib/types'
 
 // ── Create user modal ─────────────────────────────────────────────────────────
 
@@ -36,18 +36,53 @@ function CreateUserModal({
 }) {
   const [form, setForm] = useState<CreateUserForm>(EMPTY_FORM)
   const [roleId, setRoleId] = useState('')
+  const [selectedRoleName, setSelectedRoleName] = useState('')
   const [roles, setRoles] = useState<Role[]>([])
+  const [schools, setSchools] = useState<School[]>([])
+  const [selectedSchoolId, setSelectedSchoolId] = useState('')
+  const [grades, setGrades] = useState<Grade[]>([])
+  const [selectedGradeId, setSelectedGradeId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.get<Role[]>('/rbac/roles').then(setRoles)
+    api.get<School[]>('/academic/schools').then(setSchools).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (selectedRoleName === 'DIRECTOR' && selectedSchoolId) {
+      api.get<Grade[]>(`/academic/schools/${selectedSchoolId}/grades`).then(setGrades).catch(() => {})
+    } else {
+      setGrades([])
+      setSelectedGradeId('')
+    }
+  }, [selectedSchoolId, selectedRoleName])
+
+  function handleRoleChange(value: string) {
+    const role = roles.find((r) => r.public_id === value)
+    setRoleId(value)
+    setSelectedRoleName(role?.name ?? '')
+    setSelectedSchoolId('')
+    setSelectedGradeId('')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!roleId) {
       setError('Selecciona un rol para el usuario')
+      return
+    }
+    if (selectedRoleName === 'TEACHER' && !selectedSchoolId) {
+      setError('Selecciona el colegio del docente')
+      return
+    }
+    if (selectedRoleName === 'DIRECTOR' && !selectedSchoolId) {
+      setError('Selecciona el colegio del director')
+      return
+    }
+    if (selectedRoleName === 'DIRECTOR' && !selectedGradeId) {
+      setError('Selecciona el grado a dirigir')
       return
     }
     setError(null)
@@ -62,6 +97,19 @@ function CreateUserModal({
         position: form.position.trim() || null,
       })
       await api.post(`/rbac/users/${newUser.public_id}/roles/${roleId}`)
+
+      if (selectedRoleName === 'TEACHER') {
+        await api.post(`/academic/schools/${selectedSchoolId}/teachers`, {
+          user_id: newUser.public_id,
+        })
+      }
+
+      if (selectedRoleName === 'DIRECTOR') {
+        await api.post(`/academic/grades/${selectedGradeId}/director`, {
+          user_id: newUser.public_id,
+        })
+      }
+
       onCreated()
     } catch (err: any) {
       setError(err?.detail ?? 'Error al crear el usuario')
@@ -121,7 +169,7 @@ function CreateUserModal({
             <select
               required
               value={roleId}
-              onChange={(e) => setRoleId(e.target.value)}
+              onChange={(e) => handleRoleChange(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">Seleccionar rol…</option>
@@ -132,6 +180,71 @@ function CreateUserModal({
               ))}
             </select>
           </div>
+
+          {selectedRoleName === 'TEACHER' && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium">
+                Colegio<span className="text-destructive ml-1">*</span>
+              </label>
+              <select
+                required
+                value={selectedSchoolId}
+                onChange={(e) => setSelectedSchoolId(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Seleccionar colegio…</option>
+                {schools.map((s) => (
+                  <option key={s.public_id} value={s.public_id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {selectedRoleName === 'DIRECTOR' && (
+            <>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">
+                  Colegio<span className="text-destructive ml-1">*</span>
+                </label>
+                <select
+                  required
+                  value={selectedSchoolId}
+                  onChange={(e) => setSelectedSchoolId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Seleccionar colegio…</option>
+                  {schools.map((s) => (
+                    <option key={s.public_id} value={s.public_id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedSchoolId && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">
+                    Grado a dirigir<span className="text-destructive ml-1">*</span>
+                  </label>
+                  <select
+                    required
+                    value={selectedGradeId}
+                    onChange={(e) => setSelectedGradeId(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Seleccionar grado…</option>
+                    {grades.map((g) => (
+                      <option key={g.public_id} value={g.public_id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+
+          {selectedRoleName === 'STUDENT' && (
+            <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+              Los estudiantes se matriculan directamente desde el curso en la sección Académico.
+            </p>
+          )}
+
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
