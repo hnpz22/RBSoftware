@@ -137,7 +137,7 @@ def add_school_teacher(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     try:
-        _svc.add_teacher_to_school(session, school.id, user.id, current_user.id)
+        _svc.add_member_to_school(session, school.id, user.id, current_user.id)
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
     except PermissionError as exc:
@@ -169,3 +169,57 @@ def remove_school_teacher(
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+
+
+@router.post(
+    "/schools/{school_id}/members",
+    status_code=status.HTTP_201_CREATED,
+)
+def add_school_member(
+    school_id: UUID,
+    body: TeacherBody,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN")),
+):
+    school = SchoolRepository(session).get_by_public_id(school_id)
+    if school is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "School not found")
+    user = UserRepository(session).get_by_public_id(body.user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    try:
+        _svc.add_member_to_school(session, school.id, user.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    return {"detail": "Member added"}
+
+
+@router.get("/schools/{school_id}/students", response_model=list[UserRead])
+def list_school_students(
+    school_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+):
+    school = SchoolRepository(session).get_by_public_id(school_id)
+    if school is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "School not found")
+    try:
+        return _svc.get_students_for_school(session, school.id, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
+@router.get("/users/{user_id}/school-affiliation")
+def get_school_affiliation(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    try:
+        return _svc.get_user_school_affiliation(session, user_id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))

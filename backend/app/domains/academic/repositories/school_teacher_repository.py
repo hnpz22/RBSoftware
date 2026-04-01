@@ -46,6 +46,15 @@ class SchoolTeacherRepository:
         )
         return list(self.session.exec(stmt).all())
 
+    def get_schools_for_teacher(self, user_id: int) -> list:
+        from app.domains.academic.models.school import School
+        stmt = (
+            select(School)
+            .join(SchoolTeacher, SchoolTeacher.school_id == School.id)
+            .where(SchoolTeacher.user_id == user_id)
+        )
+        return list(self.session.exec(stmt).all())
+
     def _get_record(self, school_id: int, user_id: int) -> SchoolTeacher | None:
         stmt = select(SchoolTeacher).where(
             SchoolTeacher.school_id == school_id,

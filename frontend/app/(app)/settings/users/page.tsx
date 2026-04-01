@@ -85,6 +85,10 @@ function CreateUserModal({
       setError('Selecciona el grado a dirigir')
       return
     }
+    if (selectedRoleName === 'STUDENT' && !selectedSchoolId) {
+      setError('Selecciona el colegio del estudiante')
+      return
+    }
     setError(null)
     setSaving(true)
     try {
@@ -106,6 +110,12 @@ function CreateUserModal({
 
       if (selectedRoleName === 'DIRECTOR') {
         await api.post(`/academic/grades/${selectedGradeId}/director`, {
+          user_id: newUser.public_id,
+        })
+      }
+
+      if (selectedRoleName === 'STUDENT') {
+        await api.post(`/academic/schools/${selectedSchoolId}/members`, {
           user_id: newUser.public_id,
         })
       }
@@ -240,9 +250,25 @@ function CreateUserModal({
           )}
 
           {selectedRoleName === 'STUDENT' && (
-            <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-              Los estudiantes se matriculan directamente desde el curso en la sección Académico.
-            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">
+                Colegio<span className="text-destructive ml-1">*</span>
+              </label>
+              <select
+                required
+                value={selectedSchoolId}
+                onChange={(e) => setSelectedSchoolId(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Seleccionar colegio…</option>
+                {schools.map((s) => (
+                  <option key={s.public_id} value={s.public_id}>{s.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                El estudiante se matriculará en un curso desde la sección Académico.
+              </p>
+            </div>
           )}
 
           {error && (
@@ -355,6 +381,113 @@ function ChangePasswordModal({
   )
 }
 
+// ── School affiliation types & section ────────────────────────────────────────
+
+interface SchoolAffiliation {
+  role: string | null
+  school: { public_id: string; name: string } | null
+  grade: { public_id: string; name: string } | null
+  course: { public_id: string; name: string } | null
+}
+
+function ChangeSchoolSection({
+  user,
+  affiliation,
+  onChanged,
+}: {
+  user: User
+  affiliation: SchoolAffiliation | null
+  onChanged: () => void
+}) {
+  const [schools, setSchools] = useState<School[]>([])
+  const [grades, setGrades] = useState<Grade[]>([])
+  const [selectedSchool, setSelectedSchool] = useState('')
+  const [selectedGrade, setSelectedGrade] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const roleForSchool = (user.roles ?? []).find((r) =>
+    ['TEACHER', 'DIRECTOR', 'STUDENT'].includes(r)
+  )
+
+  useEffect(() => {
+    api.get<School[]>('/academic/schools').then(setSchools).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (roleForSchool === 'DIRECTOR' && selectedSchool) {
+      api.get<Grade[]>(`/academic/schools/${selectedSchool}/grades`).then(setGrades).catch(() => {})
+    } else {
+      setGrades([])
+      setSelectedGrade('')
+    }
+  }, [selectedSchool, roleForSchool])
+
+  async function handleAssign() {
+    if (!selectedSchool) return
+    setSaving(true)
+    setError(null)
+    try {
+      if (roleForSchool === 'TEACHER' || roleForSchool === 'STUDENT') {
+        await api.post(`/academic/schools/${selectedSchool}/members`, {
+          user_id: user.public_id,
+        })
+      }
+      if (roleForSchool === 'DIRECTOR') {
+        if (!selectedGrade) {
+          setError('Selecciona un grado')
+          setSaving(false)
+          return
+        }
+        await api.post(`/academic/grades/${selectedGrade}/director`, {
+          user_id: user.public_id,
+        })
+      }
+      onChanged()
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al asignar colegio')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selectClass =
+    'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring'
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        {affiliation?.school ? 'Cambiar colegio' : 'Asignar colegio'}
+      </p>
+      <select
+        value={selectedSchool}
+        onChange={(e) => setSelectedSchool(e.target.value)}
+        className={selectClass}
+      >
+        <option value="">Seleccionar colegio…</option>
+        {schools.map((s) => (
+          <option key={s.public_id} value={s.public_id}>{s.name}</option>
+        ))}
+      </select>
+      {roleForSchool === 'DIRECTOR' && selectedSchool && (
+        <select
+          value={selectedGrade}
+          onChange={(e) => setSelectedGrade(e.target.value)}
+          className={selectClass}
+        >
+          <option value="">Seleccionar grado…</option>
+          {grades.map((g) => (
+            <option key={g.public_id} value={g.public_id}>{g.name}</option>
+          ))}
+        </select>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Button size="sm" onClick={handleAssign} disabled={!selectedSchool || saving} className="w-full">
+        {saving ? 'Guardando…' : 'Asignar'}
+      </Button>
+    </div>
+  )
+}
+
 // ── User detail panel ─────────────────────────────────────────────────────────
 
 function UserPanel({
@@ -381,6 +514,8 @@ function UserPanel({
   const [position, setPosition] = useState(user.position ?? '')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [affiliation, setAffiliation] = useState<SchoolAffiliation | null>(null)
+  const [loadingAffiliation, setLoadingAffiliation] = useState(false)
 
   async function loadRoles() {
     setLoadingRoles(true)
@@ -393,6 +528,18 @@ function UserPanel({
   }
 
   useEffect(() => { loadRoles() }, [user.public_id])
+
+  useEffect(() => {
+    const hasAcademicRole = (user.roles ?? []).some((r) =>
+      ['TEACHER', 'DIRECTOR', 'STUDENT'].includes(r)
+    )
+    if (!hasAcademicRole) { setAffiliation(null); return }
+    setLoadingAffiliation(true)
+    api.get<SchoolAffiliation>(`/academic/users/${user.public_id}/school-affiliation`)
+      .then(setAffiliation)
+      .catch(() => setAffiliation(null))
+      .finally(() => setLoadingAffiliation(false))
+  }, [user.public_id, user.roles])
 
   const assignedRoleIds = new Set(userRoles.map((r) => r.public_id))
   const availableRoles = allRoles.filter((r) => !assignedRoleIds.has(r.public_id))
@@ -601,6 +748,53 @@ function UserPanel({
               </Button>
             </div>
           </div>
+        )}
+
+        {(user.roles ?? []).some((r) => ['TEACHER', 'DIRECTOR', 'STUDENT'].includes(r)) && (
+          <>
+            <hr />
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Afiliación académica
+              </p>
+              {loadingAffiliation && (
+                <p className="text-sm text-muted-foreground">Cargando…</p>
+              )}
+              {affiliation && (
+                <div className="space-y-2 text-sm">
+                  {affiliation.school && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Colegio</span>
+                      <span className="font-medium">{affiliation.school.name}</span>
+                    </div>
+                  )}
+                  {affiliation.grade && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Grado</span>
+                      <span className="font-medium">{affiliation.grade.name}</span>
+                    </div>
+                  )}
+                  {affiliation.course && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Curso</span>
+                      <span className="font-medium">{affiliation.course.name}</span>
+                    </div>
+                  )}
+                  {!affiliation.school && (
+                    <p className="text-xs text-muted-foreground italic">Sin colegio asignado</p>
+                  )}
+                </div>
+              )}
+              <ChangeSchoolSection
+                user={user}
+                affiliation={affiliation}
+                onChanged={() => {
+                  api.get<SchoolAffiliation>(`/academic/users/${user.public_id}/school-affiliation`)
+                    .then(setAffiliation)
+                }}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>

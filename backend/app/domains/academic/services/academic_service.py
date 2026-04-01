@@ -92,7 +92,7 @@ class AcademicService:
     def create_school(self, session: Session, data: SchoolCreate) -> School:
         return SchoolRepository(session).create(data)
 
-    def add_teacher_to_school(
+    def add_member_to_school(
         self,
         session: Session,
         school_id: int,
@@ -100,7 +100,7 @@ class AcademicService:
         requesting_user_id: int,
     ) -> None:
         if not self._is_admin(session, requesting_user_id):
-            raise PermissionError("Solo administradores pueden asignar docentes")
+            raise PermissionError("Solo administradores pueden asignar miembros")
 
         school = SchoolRepository(session).get_by_id(school_id)
         if school is None:
@@ -111,18 +111,18 @@ class AcademicService:
             raise LookupError("Usuario no encontrado")
 
         role_names = UserRoleRepository(session).get_role_names_for_user(user.id)
-        if "TEACHER" not in role_names:
-            raise ValueError("El usuario no tiene rol TEACHER")
+        if "TEACHER" not in role_names and "STUDENT" not in role_names:
+            raise ValueError("El usuario debe tener rol TEACHER o STUDENT")
 
         SchoolTeacherRepository(session).add(school_id, user_id)
 
         _audit.log(
             session,
             user_id=requesting_user_id,
-            action="academic.school.teacher_added",
+            action="academic.school.member_added",
             resource_type="school",
             resource_id=str(school.id),
-            payload={"teacher_user_id": user_id},
+            payload={"member_user_id": user_id},
         )
 
     def remove_teacher_from_school(
@@ -169,15 +169,88 @@ class AcademicService:
                     "Solo administradores o directores del colegio pueden ver docentes"
                 )
 
-        teachers = SchoolTeacherRepository(session).list_teachers(school_id)
+        members = SchoolTeacherRepository(session).list_teachers(school_id)
         role_repo = UserRoleRepository(session)
         result = []
-        for user in teachers:
+        for user in members:
             role_names = role_repo.get_role_names_for_user(user.id)
-            result.append(
-                UserRead.model_validate(user).model_copy(update={"roles": role_names})
-            )
+            if "TEACHER" in role_names:
+                result.append(
+                    UserRead.model_validate(user).model_copy(update={"roles": role_names})
+                )
         return result
+
+    def get_students_for_school(
+        self,
+        session: Session,
+        school_id: int,
+        requesting_user_id: int,
+    ) -> list[UserRead]:
+        if not self._is_admin(session, requesting_user_id):
+            grades = GradeDirectorRepository(session).get_grades_for_director(
+                requesting_user_id
+            )
+            school_ids = {g.school_id for g in grades}
+            if school_id not in school_ids:
+                raise PermissionError(
+                    "Solo administradores o directores del colegio pueden ver estudiantes"
+                )
+
+        members = SchoolTeacherRepository(session).list_teachers(school_id)
+        role_repo = UserRoleRepository(session)
+        result = []
+        for user in members:
+            role_names = role_repo.get_role_names_for_user(user.id)
+            if "STUDENT" in role_names:
+                result.append(
+                    UserRead.model_validate(user).model_copy(update={"roles": role_names})
+                )
+        return result
+
+    def get_user_school_affiliation(
+        self, session: Session, user_public_id: UUID
+    ) -> dict:
+        user = UserRepository(session).get_by_public_id(user_public_id)
+        if user is None:
+            raise LookupError("Usuario no encontrado")
+
+        role_names = UserRoleRepository(session).get_role_names_for_user(user.id)
+
+        if "TEACHER" in role_names:
+            schools = SchoolTeacherRepository(session).get_schools_for_teacher(user.id)
+            if schools:
+                s = schools[0]
+                return {
+                    "role": "TEACHER",
+                    "school": {"public_id": str(s.public_id), "name": s.name},
+                    "grade": None,
+                    "course": None,
+                }
+
+        if "DIRECTOR" in role_names:
+            grades = GradeDirectorRepository(session).get_grades_for_director(user.id)
+            if grades:
+                g = grades[0]
+                s = SchoolRepository(session).get_by_id(g.school_id)
+                return {
+                    "role": "DIRECTOR",
+                    "school": {"public_id": str(s.public_id), "name": s.name},
+                    "grade": {"public_id": str(g.public_id), "name": g.name},
+                    "course": None,
+                }
+
+        if "STUDENT" in role_names:
+            schools = SchoolTeacherRepository(session).get_schools_for_teacher(user.id)
+            if schools:
+                s = schools[0]
+                return {
+                    "role": "STUDENT",
+                    "school": {"public_id": str(s.public_id), "name": s.name},
+                    "grade": None,
+                    "course": None,
+                }
+
+        return {"role": None, "school": None, "grade": None, "course": None}
 
     # ── Grades ───────────────────────────────────────────────────────────────
 
