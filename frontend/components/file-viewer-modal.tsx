@@ -5,6 +5,7 @@ import { AlertCircle, Download, FileText, Image as ImageIcon, Loader2, X } from 
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import { useAuthStore } from '@/lib/store'
+import { AdobePDFViewer } from './adobe-pdf-viewer'
 
 interface Props {
   isOpen: boolean
@@ -37,15 +38,8 @@ export function FileViewerModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resolvedType, setResolvedType] = useState<'PDF' | 'IMAGE' | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
   const [visible, setVisible] = useState(false)
   const isAdmin = useAuthStore((s) => s.isAdmin)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsMobile(window.innerWidth < 768)
-    }
-  }, [isOpen])
 
   useEffect(() => {
     if (isOpen) {
@@ -132,16 +126,16 @@ export function FileViewerModal({
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 items-center justify-center overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
           {loading && (
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
               <Loader2 size={24} className="animate-spin" />
               <span className="text-sm">Cargando archivo…</span>
             </div>
           )}
 
           {error && (
-            <div className="flex h-full flex-col items-center justify-center gap-3">
+            <div className="flex flex-1 flex-col items-center justify-center gap-3">
               <AlertCircle className="text-destructive" size={32} />
               <p className="text-sm text-muted-foreground">No se pudo cargar el archivo</p>
               {url && (
@@ -153,25 +147,25 @@ export function FileViewerModal({
           )}
 
           {!loading && !error && url && resolvedType === 'PDF' && (
-            isMobile ? (
-              <div className="flex flex-col items-center justify-center gap-3">
-                <FileText size={48} className="text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Vista previa no disponible en móvil</p>
-                <Button variant="outline" size="sm" onClick={() => window.open(url, '_blank')}>
-                  Abrir PDF
-                </Button>
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="flex-1">
+                <AdobePDFViewer url={url} fileName={fileName} height="100%" />
               </div>
-            ) : (
-              <iframe
-                src={`${url}#toolbar=0&navpanes=0`}
-                className="h-full w-full border-0"
-                title={fileName}
-              />
-            )
+              <div className="py-2 text-center md:hidden">
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  Abrir en nueva pestaña →
+                </a>
+              </div>
+            </div>
           )}
 
           {!loading && !error && url && resolvedType === 'IMAGE' && (
-            <div className="flex h-full w-full items-center justify-center bg-muted/20 p-4">
+            <div className="flex flex-1 items-center justify-center bg-muted/20 p-4">
               <img
                 src={url}
                 alt={fileName}
