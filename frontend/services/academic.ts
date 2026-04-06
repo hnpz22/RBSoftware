@@ -3,6 +3,7 @@ import type {
   AssignmentRead,
   CourseDetail,
   CourseRead,
+  Gradebook,
   Grade,
   GradeWithCourses,
   MaterialRead,
@@ -260,6 +261,12 @@ export function gradeSubmission(
   data: { score: number; feedback?: string | null },
 ) {
   return api.post(`/academic/submissions/${submissionId}/grade`, data)
+}
+
+// ── Gradebook ───────────────────────────────────────────────────────────────
+
+export function getGradebook(courseId: string) {
+  return api.get<Gradebook>(`/academic/courses/${courseId}/gradebook`)
 }
 
 // ── Student content ──────────────────────────────────────────────────────────

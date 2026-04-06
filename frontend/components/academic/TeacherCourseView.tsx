@@ -8,6 +8,7 @@ import { UnitsSidebar } from './UnitsSidebar'
 import { UnitDetailPanel } from './UnitDetailPanel'
 import { CreateUnitModal } from './CreateUnitModal'
 import { CourseStudentsTab } from './CourseStudentsTab'
+import { GradebookTab } from './GradebookTab'
 
 interface Props {
   course: CourseDetail
@@ -16,7 +17,7 @@ interface Props {
   canEditContent: boolean
 }
 
-type CourseTab = 'content' | 'students'
+type CourseTab = 'content' | 'students' | 'gradebook'
 
 export function TeacherCourseView({ course, units, reload, canEditContent }: Props) {
   const router = useRouter()
@@ -31,6 +32,7 @@ export function TeacherCourseView({ course, units, reload, canEditContent }: Pro
   const courseTabs: { key: CourseTab; label: string }[] = [
     { key: 'content', label: 'Contenido' },
     { key: 'students', label: `Estudiantes (${course.students.length})` },
+    { key: 'gradebook', label: 'Planilla' },
   ]
 
   return (
@@ -99,6 +101,12 @@ export function TeacherCourseView({ course, units, reload, canEditContent }: Pro
         {courseTab === 'students' && (
           <div className="flex-1 overflow-y-auto p-4">
             <CourseStudentsTab course={course} onStudentChanged={reload} />
+          </div>
+        )}
+
+        {courseTab === 'gradebook' && (
+          <div className="flex-1 overflow-hidden">
+            <GradebookTab courseId={course.public_id} courseName={course.name} />
           </div>
         )}
       </div>

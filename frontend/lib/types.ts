@@ -276,6 +276,33 @@ export interface CourseDetail {
   units: UnitRead[]
 }
 
+export interface GradebookAssignment {
+  public_id: string
+  title: string
+  max_score: number
+  due_date: string | null
+}
+
+export interface GradebookGrade {
+  score: number | null
+  status: string
+  submission_public_id: string
+}
+
+export interface GradebookStudent {
+  student: { public_id: string; first_name: string; last_name: string; email: string }
+  grades: Record<string, GradebookGrade | null>
+  average: number | null
+  completed: number
+  total: number
+}
+
+export interface Gradebook {
+  course: { public_id: string; name: string }
+  assignments: GradebookAssignment[]
+  students: GradebookStudent[]
+}
+
 export interface UnitRead {
   public_id: string
   title: string

@@ -225,3 +225,20 @@ def get_course_content(
             )
         )
     return result
+
+
+@router.get("/courses/{course_id}/gradebook")
+def get_gradebook(
+    course_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
+):
+    course = CourseRepository(session).get_by_public_id(course_id)
+    if course is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+    try:
+        return _svc.get_gradebook(session, course.id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))

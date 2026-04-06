@@ -970,6 +970,72 @@ class AcademicService:
         )
         return {"url": url, "file_name": submission.file_name}
 
+    # ── Gradebook ──────────────────────────────────────────────────────────
+
+    def get_gradebook(
+        self,
+        session: Session,
+        course_id: int,
+        requesting_user_id: int,
+    ) -> dict:
+        course = CourseRepository(session).get_by_id(course_id)
+        if course is None:
+            raise LookupError("Curso no encontrado")
+
+        is_admin = self._is_admin(session, requesting_user_id)
+        if not is_admin and course.teacher_id != requesting_user_id:
+            raise PermissionError("Solo el docente del curso puede ver la planilla")
+
+        assignments = AssignmentRepository(session).list_by_course(course.id)
+        students = CourseStudentRepository(session).get_students(course.id)
+
+        result_students = []
+        for student in students:
+            grades = {}
+            scores: list[int] = []
+            for assignment in assignments:
+                sub = SubmissionRepository(session).get_by_student_and_assignment(
+                    student.id, assignment.id
+                )
+                if sub:
+                    grades[str(assignment.public_id)] = {
+                        "score": sub.score,
+                        "status": sub.status,
+                        "submission_public_id": str(sub.public_id),
+                    }
+                    if sub.score is not None:
+                        scores.append(sub.score)
+                else:
+                    grades[str(assignment.public_id)] = None
+
+            average = round(sum(scores) / len(scores), 1) if scores else None
+            result_students.append({
+                "student": {
+                    "public_id": str(student.public_id),
+                    "first_name": student.first_name,
+                    "last_name": student.last_name,
+                    "email": student.email,
+                },
+                "grades": grades,
+                "average": average,
+                "completed": len(scores),
+                "total": len(assignments),
+            })
+
+        return {
+            "course": {"public_id": str(course.public_id), "name": course.name},
+            "assignments": [
+                {
+                    "public_id": str(a.public_id),
+                    "title": a.title,
+                    "max_score": a.max_score,
+                    "due_date": str(a.due_date) if a.due_date else None,
+                }
+                for a in assignments
+            ],
+            "students": result_students,
+        }
+
     # ── Queries ──────────────────────────────────────────────────────────────
 
     def get_my_courses_as_teacher(
