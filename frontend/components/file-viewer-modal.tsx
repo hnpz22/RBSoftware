@@ -114,7 +114,7 @@ export function FileViewerModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/60 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose()
       }}
