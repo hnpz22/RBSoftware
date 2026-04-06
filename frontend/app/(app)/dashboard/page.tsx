@@ -17,6 +17,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ErrorBanner } from '@/components/error-banner'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import type {
@@ -48,13 +49,16 @@ function StatCard({
 }) {
   const content = (
     <Card
-      className={
+      className={`relative overflow-hidden ${
         alert && (value as number) > 0
           ? 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20'
           : ''
-      }
+      }`}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+        alert && (value as number) > 0 ? 'bg-accent' : 'bg-primary'
+      }`} />
+      <CardHeader className="flex flex-row items-center justify-between pb-2 pl-5">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
@@ -67,7 +71,7 @@ function StatCard({
           }
         />
       </CardHeader>
-      <CardContent>
+      <CardContent className="pl-5">
         <p
           className={`text-3xl font-bold ${alert && (value as number) > 0 ? 'text-red-600' : ''}`}
         >
@@ -101,28 +105,36 @@ function AdminPanel() {
     criticalStock: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    Promise.all([
-      api.get<SalesOrder[]>('/commercial/orders'),
-      api.get<ProductionBatch[]>('/production/batches'),
-      api.get<StockAlert[]>('/inventory/alerts'),
-    ])
-      .then(([orders, batches, alerts]) => {
-        setStats({
-          pendingOrders: orders.filter((o) => o.status === 'PENDING').length,
-          approvedOrders: orders.filter((o) => o.status === 'APPROVED').length,
-          activeBatches: batches.filter((b) =>
-            ['PENDING', 'IN_PROGRESS'].includes(b.status),
-          ).length,
-          criticalStock: alerts.filter((a) => a.status_color === 'RED').length,
-        })
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const [orders, batches, alerts] = await Promise.all([
+        api.get<SalesOrder[]>('/commercial/orders'),
+        api.get<ProductionBatch[]>('/production/batches'),
+        api.get<StockAlert[]>('/inventory/alerts'),
+      ])
+      setStats({
+        pendingOrders: orders.filter((o) => o.status === 'PENDING').length,
+        approvedOrders: orders.filter((o) => o.status === 'APPROVED').length,
+        activeBatches: batches.filter((b) =>
+          ['PENDING', 'IN_PROGRESS'].includes(b.status),
+        ).length,
+        criticalStock: alerts.filter((a) => a.status_color === 'RED').length,
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar el dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <SkeletonCards count={4} />
+  if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -163,29 +175,37 @@ function OperativoPanel() {
     fulfillmentOrders: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    Promise.all([
-      api.get<ProductionBatch[]>('/production/batches'),
-      api.get<StockAlert[]>('/inventory/alerts'),
-      api.get<SalesOrder[]>('/commercial/orders'),
-    ])
-      .then(([batches, alerts, orders]) => {
-        setStats({
-          activeBatches: batches.filter((b) =>
-            ['PENDING', 'IN_PROGRESS'].includes(b.status),
-          ).length,
-          criticalStock: alerts.filter((a) => a.status_color === 'RED').length,
-          fulfillmentOrders: orders.filter(
-            (o) => o.fulfillment_status === 'PACKING',
-          ).length,
-        })
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const [batches, alerts, orders] = await Promise.all([
+        api.get<ProductionBatch[]>('/production/batches'),
+        api.get<StockAlert[]>('/inventory/alerts'),
+        api.get<SalesOrder[]>('/commercial/orders'),
+      ])
+      setStats({
+        activeBatches: batches.filter((b) =>
+          ['PENDING', 'IN_PROGRESS'].includes(b.status),
+        ).length,
+        criticalStock: alerts.filter((a) => a.status_color === 'RED').length,
+        fulfillmentOrders: orders.filter(
+          (o) => o.fulfillment_status === 'PACKING',
+        ).length,
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar el dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <SkeletonCards count={3} />
+  if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -222,25 +242,32 @@ function ComercialPanel() {
     todaySales: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api
-      .get<SalesOrder[]>('/commercial/orders')
-      .then((orders) => {
-        const today = new Date().toISOString().slice(0, 10)
-        setStats({
-          pendingOrders: orders.filter((o) => o.status === 'PENDING').length,
-          approvedOrders: orders.filter((o) => o.status === 'APPROVED').length,
-          todaySales: orders.filter(
-            (o) => o.created_at.slice(0, 10) === today,
-          ).length,
-        })
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const orders = await api.get<SalesOrder[]>('/commercial/orders')
+      const today = new Date().toISOString().slice(0, 10)
+      setStats({
+        pendingOrders: orders.filter((o) => o.status === 'PENDING').length,
+        approvedOrders: orders.filter((o) => o.status === 'APPROVED').length,
+        todaySales: orders.filter(
+          (o) => o.created_at.slice(0, 10) === today,
+        ).length,
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar el dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <SkeletonCards count={3} />
+  if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -273,21 +300,28 @@ function TeacherPanel() {
     pendingGrading: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api
-      .get<CourseRead[]>('/academic/my-courses')
-      .then((courses) => {
-        setStats((prev) => ({
-          ...prev,
-          activeCourses: courses.filter((c) => c.is_active).length,
-        }))
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const courses = await api.get<CourseRead[]>('/academic/my-courses')
+      setStats((prev) => ({
+        ...prev,
+        activeCourses: courses.filter((c) => c.is_active).length,
+      }))
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar el dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <SkeletonCards count={2} />
+  if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -315,44 +349,51 @@ function DirectorPanel() {
     activeCourses: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api
-      .get<Grade[]>('/academic/my-grades')
-      .then(async (grades) => {
-        let totalStudents = 0
-        let activeCourses = 0
-        const details = await Promise.all(
-          grades.map((g) =>
-            api.get<GradeWithCourses>(`/academic/grades/${g.public_id}`),
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const grades = await api.get<Grade[]>('/academic/my-grades')
+      let totalStudents = 0
+      let activeCourses = 0
+      const details = await Promise.all(
+        grades.map((g) =>
+          api.get<GradeWithCourses>(`/academic/grades/${g.public_id}`),
+        ),
+      )
+      for (const d of details) {
+        activeCourses += d.courses.filter((c) => c.is_active).length
+        const courseDetails = await Promise.all(
+          d.courses.map((c) =>
+            api
+              .get<{ public_id: string }[]>(
+                `/academic/courses/${c.public_id}/students`,
+              )
+              .catch(() => [] as { public_id: string }[]),
           ),
         )
-        for (const d of details) {
-          activeCourses += d.courses.filter((c) => c.is_active).length
-          const courseDetails = await Promise.all(
-            d.courses.map((c) =>
-              api
-                .get<{ public_id: string }[]>(
-                  `/academic/courses/${c.public_id}/students`,
-                )
-                .catch(() => [] as { public_id: string }[]),
-            ),
-          )
-          for (const students of courseDetails) {
-            totalStudents += students.length
-          }
+        for (const students of courseDetails) {
+          totalStudents += students.length
         }
-        setStats({
-          gradesCount: grades.length,
-          totalStudents,
-          activeCourses,
-        })
+      }
+      setStats({
+        gradesCount: grades.length,
+        totalStudents,
+        activeCourses,
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar el dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <SkeletonCards count={3} />
+  if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -386,53 +427,60 @@ function StudentPanel() {
     gradedThisWeek: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api
-      .get<CourseRead[]>('/academic/my-courses')
-      .then(async (courses) => {
-        let pending = 0
-        let gradedWeek = 0
-        const now = new Date()
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const courses = await api.get<CourseRead[]>('/academic/my-courses')
+      let pending = 0
+      let gradedWeek = 0
+      const now = new Date()
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-        const allContent = await Promise.all(
-          courses.map((c) =>
-            api
-              .get<StudentUnitContent[]>(
-                `/academic/courses/${c.public_id}/content`,
-              )
-              .catch(() => [] as StudentUnitContent[]),
-          ),
-        )
+      const allContent = await Promise.all(
+        courses.map((c) =>
+          api
+            .get<StudentUnitContent[]>(
+              `/academic/courses/${c.public_id}/content`,
+            )
+            .catch(() => [] as StudentUnitContent[]),
+        ),
+      )
 
-        for (const units of allContent) {
-          for (const unit of units) {
-            for (const a of unit.assignments) {
-              if (!a.my_submission) {
-                pending++
-              } else if (
-                a.my_submission.status === 'GRADED' &&
-                a.my_submission.graded_at &&
-                new Date(a.my_submission.graded_at) >= weekAgo
-              ) {
-                gradedWeek++
-              }
+      for (const units of allContent) {
+        for (const unit of units) {
+          for (const a of unit.assignments) {
+            if (!a.my_submission) {
+              pending++
+            } else if (
+              a.my_submission.status === 'GRADED' &&
+              a.my_submission.graded_at &&
+              new Date(a.my_submission.graded_at) >= weekAgo
+            ) {
+              gradedWeek++
             }
           }
         }
+      }
 
-        setStats({
-          coursesCount: courses.length,
-          pendingAssignments: pending,
-          gradedThisWeek: gradedWeek,
-        })
+      setStats({
+        coursesCount: courses.length,
+        pendingAssignments: pending,
+        gradedThisWeek: gradedWeek,
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar el dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   if (loading) return <SkeletonCards count={3} />
+  if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -479,10 +527,10 @@ function SkeletonCards({ count }: { count: number }) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const ROLE_SUBTITLES: Record<string, string> = {
-  ADMIN: 'Panel de administración',
+  ADMIN: 'Panel de administración — RBSoftware',
   DIRECTOR: 'Panel de dirección académica',
   TEACHER: 'Panel docente',
-  STUDENT: 'Panel estudiantil',
+  STUDENT: 'Tu espacio de aprendizaje',
   OPERATIVO: 'Panel operativo',
   COMERCIAL: 'Panel comercial',
 }
@@ -526,11 +574,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl font-semibold">
-          Hola, {user?.first_name ?? ''}
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold text-foreground">
+          Bienvenido, {user?.first_name ?? ''} 👋
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1">
           {getSubtitle(roles)}
         </p>
       </div>

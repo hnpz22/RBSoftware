@@ -3,25 +3,46 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* Base */
+  --background: 220 20% 97%;
+  --foreground: 213 60% 10%;
+
+  /* Card */
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 213 60% 10%;
+
+  /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  --popover-foreground: 213 60% 10%;
+
+  /* Primary — Azul navy RobotSchool */
+  --primary: 231 64% 29%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary */
+  --secondary: 220 14% 93%;
+  --secondary-foreground: 231 64% 29%;
+
+  /* Muted */
+  --muted: 220 14% 93%;
+  --muted-foreground: 215 16% 47%;
+
+  /* Accent — Naranja RobotSchool */
+  --accent: 33 100% 50%;
+  --accent-foreground: 0 0% 100%;
+
+  /* Destructive */
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Border e Input */
+  --border: 220 13% 88%;
+  --input: 220 13% 88%;
+
+  /* Ring */
+  --ring: 231 64% 29%;
+
+  /* Border radius */
   --radius: 0.5rem;
 }
 
@@ -31,4 +52,11 @@
 
 body {
   @apply bg-background text-foreground;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
