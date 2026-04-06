@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Download, ExternalLink, Loader2, X } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { AlertCircle, Download, FileText, Image as ImageIcon, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import { useAuthStore } from '@/lib/store'
@@ -9,36 +9,79 @@ import { useAuthStore } from '@/lib/store'
 interface Props {
   isOpen: boolean
   onClose: () => void
+  fileName: string
+  fileType?: 'PDF' | 'IMAGE' | 'auto'
   materialId?: string | null
   submissionId?: string | null
   localUrl?: string | null
-  fileName: string
-  fileType: 'PDF' | 'IMAGE'
 }
 
-export function FileViewerModal({ isOpen, onClose, materialId, submissionId, localUrl, fileName, fileType }: Props) {
+function detectType(fileName: string, contentType?: string): 'PDF' | 'IMAGE' {
+  const ext = fileName?.split('.').pop()?.toLowerCase()
+  if (contentType?.includes('pdf') || ext === 'pdf') return 'PDF'
+  if (contentType?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext ?? ''))
+    return 'IMAGE'
+  return 'PDF'
+}
+
+export function FileViewerModal({
+  isOpen,
+  onClose,
+  fileName,
+  fileType = 'auto',
+  materialId,
+  submissionId,
+  localUrl,
+}: Props) {
   const [url, setUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [resolvedType, setResolvedType] = useState<'PDF' | 'IMAGE' | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [visible, setVisible] = useState(false)
   const isAdmin = useAuthStore((s) => s.isAdmin)
 
   useEffect(() => {
-    if (!isOpen) {
+    if (typeof window !== 'undefined') {
+      setIsMobile(window.innerWidth < 768)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => setVisible(true))
+    } else {
+      setVisible(false)
       setUrl(null)
       setError(null)
-      return
+      setResolvedType(null)
     }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
 
     if (localUrl) {
       setUrl(localUrl)
+      setResolvedType(fileType !== 'auto' ? fileType : detectType(fileName))
       setLoading(false)
       return
     }
 
     const fetchUrl = submissionId
-      ? academicService.viewSubmission(submissionId).then((res) => res.url)
+      ? academicService.viewSubmission(submissionId).then((res) => {
+          setResolvedType(
+            fileType !== 'auto'
+              ? fileType
+              : detectType(res.file_name ?? fileName, (res as any).content_type),
+          )
+          return res.url
+        })
       : materialId
-        ? academicService.viewMaterial(materialId).then((res) => res.url)
+        ? academicService.viewMaterial(materialId).then((res) => {
+            setResolvedType(fileType !== 'auto' ? fileType : detectType(fileName))
+            return res.url
+          })
         : null
 
     if (!fetchUrl) return
@@ -49,29 +92,47 @@ export function FileViewerModal({ isOpen, onClose, materialId, submissionId, loc
       .then((u) => setUrl(u))
       .catch((err: any) => setError(err?.detail ?? 'Error al obtener el archivo'))
       .finally(() => setLoading(false))
-  }, [isOpen, localUrl, submissionId, materialId])
+  }, [isOpen, localUrl, submissionId, materialId, fileName, fileType])
 
-  const handleDownload = () => {
-    if (!materialId) return
-    academicService
-      .downloadMaterial(materialId)
-      .then((res) => window.open(res.url, '_blank'))
-      .catch((err: any) => setError(err?.detail ?? 'Error al descargar el archivo'))
-  }
+  const handleClose = useCallback(() => {
+    setVisible(false)
+    setTimeout(onClose, 200)
+  }, [onClose])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, handleClose])
 
   if (!isOpen) return null
 
+  const TypeIcon = resolvedType === 'IMAGE' ? ImageIcon : FileText
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="flex h-full w-full flex-col bg-background md:h-[90vh] md:max-h-[90vh] md:w-[90vw] md:max-w-[90vw] md:rounded-lg md:border md:shadow-xl">
-        <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
-          <h3 className="truncate text-sm font-semibold">{fileName}</h3>
-          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose()
+      }}
+    >
+      <div
+        className={`flex flex-col bg-background transition-all duration-200 ${visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'} h-full w-full md:h-[90vh] md:max-h-[90vh] md:max-w-4xl md:rounded-lg md:border md:shadow-xl`}
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
+          <TypeIcon size={16} className="shrink-0 text-muted-foreground" />
+          <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{fileName}</h3>
+          <button onClick={handleClose} className="rounded-md p-1 hover:bg-muted">
             <X size={16} />
           </button>
         </div>
 
-        <div className="flex flex-1 items-center justify-center overflow-hidden p-2">
+        {/* Body */}
+        <div className="flex flex-1 items-center justify-center overflow-hidden">
           {loading && (
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <Loader2 size={24} className="animate-spin" />
@@ -80,53 +141,71 @@ export function FileViewerModal({ isOpen, onClose, materialId, submissionId, loc
           )}
 
           {error && (
-            <div className="flex flex-col items-center gap-3 text-center">
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <AlertCircle className="text-destructive" size={32} />
+              <p className="text-sm text-muted-foreground">No se pudo cargar el archivo</p>
               {url && (
-                <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank')}>
-                  <ExternalLink size={14} />
-                  <span className="ml-1">Abrir en nueva pestaña</span>
+                <Button variant="outline" size="sm" onClick={() => window.open(url, '_blank')}>
+                  Abrir en nueva pestaña
                 </Button>
               )}
             </div>
           )}
 
-          {!loading && !error && url && fileType === 'PDF' && (
-            <iframe
-              src={`${url}#toolbar=0&navpanes=0&scrollbar=1`}
-              className="h-full w-full border-0"
-              title={fileName}
-            />
+          {!loading && !error && url && resolvedType === 'PDF' && (
+            isMobile ? (
+              <div className="flex flex-col items-center justify-center gap-3">
+                <FileText size={48} className="text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Vista previa no disponible en móvil</p>
+                <Button variant="outline" size="sm" onClick={() => window.open(url, '_blank')}>
+                  Abrir PDF
+                </Button>
+              </div>
+            ) : (
+              <iframe
+                src={`${url}#toolbar=0&navpanes=0`}
+                className="h-full w-full border-0"
+                title={fileName}
+              />
+            )
           )}
 
-          {!loading && !error && url && fileType === 'IMAGE' && (
-            <img
-              src={url}
-              alt={fileName}
-              className="max-h-full max-w-full object-contain mx-auto"
-              onContextMenu={(e) => e.preventDefault()}
-              draggable={false}
-            />
+          {!loading && !error && url && resolvedType === 'IMAGE' && (
+            <div className="flex h-full w-full items-center justify-center bg-muted/20 p-4">
+              <img
+                src={url}
+                alt={fileName}
+                className="max-h-full max-w-full rounded object-contain"
+                onContextMenu={(e) => e.preventDefault()}
+                draggable={false}
+              />
+            </div>
           )}
         </div>
 
+        {/* Footer */}
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-3">
-          <div className="md:hidden">
-            {!loading && url && fileType === 'PDF' && !localUrl && !submissionId && (
-              <Button size="sm" variant="outline" onClick={() => window.open(url, '_blank')}>
-                <ExternalLink size={14} />
-                <span className="ml-1">Abrir en nueva pestaña</span>
-              </Button>
+          <div>
+            {resolvedType && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  resolvedType === 'PDF'
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                }`}
+              >
+                {resolvedType}
+              </span>
             )}
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            {!loading && url && !localUrl && !submissionId && isAdmin() && (
-              <Button size="sm" variant="outline" onClick={handleDownload}>
+          <div className="flex items-center gap-2">
+            {!loading && url && isAdmin() && (
+              <Button variant="outline" size="sm" onClick={() => window.open(url, '_blank')}>
                 <Download size={14} />
                 <span className="ml-1">Descargar</span>
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={handleClose}>
               Cerrar
             </Button>
           </div>

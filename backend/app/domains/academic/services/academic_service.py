@@ -54,6 +54,20 @@ class AcademicService:
         role_names = UserRoleRepository(session).get_role_names_for_user(user_id)
         return "ADMIN" in role_names
 
+    @staticmethod
+    def _detect_content_type(file_name: str | None) -> str:
+        if not file_name:
+            return "application/octet-stream"
+        ext = file_name.rsplit(".", 1)[-1].lower()
+        return {
+            "pdf": "application/pdf",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "gif": "image/gif",
+            "webp": "image/webp",
+        }.get(ext, "application/octet-stream")
+
     def _assert_admin_or_director(
         self, session: Session, grade_id: int, user_id: int
     ) -> None:
@@ -929,7 +943,11 @@ class AcademicService:
         url = storage_service.generate_presigned_url(
             submission.file_key, expires_seconds=3600, inline=True
         )
-        return {"url": url, "file_name": submission.file_name}
+        return {
+            "url": url,
+            "file_name": submission.file_name,
+            "content_type": self._detect_content_type(submission.file_name),
+        }
 
     def get_submission_download_url(
         self,

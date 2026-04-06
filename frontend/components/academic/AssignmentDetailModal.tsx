@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ExternalLink, X } from 'lucide-react'
+import { Eye, Paperclip, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import type { SubmissionWithStudent } from '@/lib/types'
 import { GradeSubmissionModal } from './GradeSubmissionModal'
+import { FileViewerModal } from '@/components/file-viewer-modal'
 
 interface Props {
   assignmentId: string
@@ -18,7 +19,7 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
   const [loading, setLoading] = useState(true)
   const [gradingId, setGradingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [viewingSubmission, setViewingSubmission] = useState<{ id: string; name: string } | null>(null)
 
   async function load() {
     setLoading(true)
@@ -35,20 +36,17 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
     load()
   }, [assignmentId])
 
-  async function handleDownloadFile(submissionId: string) {
-    setDownloadingId(submissionId)
-    try {
-      const { url } = await academicService.downloadSubmission(submissionId)
-      window.open(url, '_blank')
-    } finally {
-      setDownloadingId(null)
-    }
-  }
-
   const gradingSub = submissions.find((s) => s.public_id === gradingId)
 
   return (
     <>
+      <FileViewerModal
+        isOpen={viewingSubmission !== null}
+        onClose={() => setViewingSubmission(null)}
+        submissionId={viewingSubmission?.id}
+        fileName={viewingSubmission?.name ?? ''}
+      />
+
       {gradingSub && (
         <GradeSubmissionModal
           submission={gradingSub}
@@ -101,6 +99,16 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {s.file_name ? (
+                          <Badge variant="outline" className="gap-1 border-green-300 text-green-700 dark:border-green-700 dark:text-green-400">
+                            <Paperclip size={10} />
+                            Con archivo
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Solo texto
+                          </Badge>
+                        )}
                         <Badge
                           variant={
                             s.status === 'GRADED' ? 'success' : 'warning'
@@ -138,17 +146,13 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
                           <p className="text-xs text-muted-foreground">
                             Archivo: {s.file_name}
                           </p>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={downloadingId === s.public_id}
-                            onClick={() => handleDownloadFile(s.public_id)}
+                          <button
+                            onClick={() => setViewingSubmission({ id: s.public_id, name: s.file_name! })}
+                            className="flex items-center gap-1 text-xs text-primary hover:underline"
                           >
-                            <ExternalLink size={12} />
-                            <span className="ml-1">
-                              {downloadingId === s.public_id ? 'Abriendo...' : 'Ver archivo'}
-                            </span>
-                          </Button>
+                            <Eye size={12} />
+                            Ver archivo
+                          </button>
                         </div>
                       )}
 
