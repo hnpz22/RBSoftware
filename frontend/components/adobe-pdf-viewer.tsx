@@ -18,6 +18,12 @@ export function AdobePDFViewer({
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    // Skip Adobe if no key configured
+    if (!ADOBE_KEY) {
+      setError(true)
+      return
+    }
+
     const checkReady = setInterval(() => {
       if (window.AdobeDC) {
         setReady(true)
@@ -65,19 +71,15 @@ export function AdobePDFViewer({
     }
   }, [ready, url, fileName])
 
+  // Fallback: iframe viewer (works on localhost and when Adobe fails)
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-        <p className="text-sm">No se pudo cargar el visor de PDF</p>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-primary hover:underline"
-        >
-          Abrir en nueva pestaña
-        </a>
-      </div>
+      <iframe
+        src={`${url}#toolbar=0&navpanes=0&scrollbar=1`}
+        className="h-full w-full border-0"
+        title={fileName}
+        style={{ height, width: '100%' }}
+      />
     )
   }
 
