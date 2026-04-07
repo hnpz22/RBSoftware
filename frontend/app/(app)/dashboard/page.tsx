@@ -569,8 +569,20 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {unauthorizedError && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
-          No tienes permisos para acceder a esa sección.
+        <div className="flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900 dark:bg-red-950/30">
+          <p className="text-sm text-red-700 dark:text-red-400">
+            No tienes permisos para acceder a esa sección. Si crees que esto es
+            un error, cierra sesión y vuelve a ingresar.
+          </p>
+          <button
+            onClick={async () => {
+              await api.post('/auth/logout').catch(() => {})
+              window.location.href = '/login'
+            }}
+            className="shrink-0 text-xs font-medium text-red-700 hover:underline dark:text-red-400"
+          >
+            Cerrar sesión →
+          </button>
         </div>
       )}
 
