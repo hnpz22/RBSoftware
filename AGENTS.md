@@ -374,6 +374,33 @@ Endpoints protegidos en `backend/app/domains/academic/routes/`:
 - `submissions.py` → STUDENT (submit/my-submission), ADMIN+TEACHER (grade)
 - `students.py` → ADMIN+DIRECTOR (transfer)
 
+## Precauciones con Docker
+
+Los volúmenes de MySQL y MinIO son nombrados (`mysql_data_dev`, `minio_data_dev`)
+para que persistan entre reinicios de contenedores.
+
+**NUNCA ejecutar:**
+```bash
+docker compose down -v              # elimina TODOS los volúmenes y datos
+docker volume rm rbsoftware_mysql_data_dev   # elimina la DB manualmente
+```
+
+**Para parar sin perder datos:**
+```bash
+docker compose -f compose.dev.yml down       # sin -v
+docker compose -f compose.dev.yml stop       # solo detiene, no remueve
+```
+
+**Para reiniciar limpio intencionalmente:**
+```bash
+docker compose -f compose.dev.yml down -v
+docker compose -f compose.dev.yml up --build -d
+docker compose -f compose.dev.yml exec backend alembic upgrade head
+docker compose -f compose.dev.yml exec backend python scripts/seed.py
+```
+
+---
+
 ## Deuda técnica conocida
 - POST /auth/users no valida complejidad de contraseña en backend
 - change_password solo permite cambiar la propia contraseña —
