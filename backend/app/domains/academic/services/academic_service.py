@@ -20,6 +20,7 @@ from app.domains.academic.repositories import (
     GradeDirectorRepository,
     GradeRepository,
     MaterialRepository,
+    PDFAnnotationRepository,
     SchoolRepository,
     SchoolTeacherRepository,
     SubmissionRepository,
@@ -1128,3 +1129,41 @@ class AcademicService:
             result.append((unit, materials, assignment_data))
 
         return course, result
+
+    # ── PDF Annotations ─────────────────────────────────────────────────────
+
+    def get_annotations(
+        self, session: Session, material_id: UUID, requesting_user_id: int
+    ) -> dict:
+        material = MaterialRepository(session).get_by_public_id(material_id)
+        if not material:
+            raise LookupError("Material no encontrado")
+
+        user = UserRepository(session).get_by_id(requesting_user_id)
+
+        annotation = PDFAnnotationRepository(session).get_by_user_and_material(
+            user.id, material.id
+        )
+
+        return {"highlights": annotation.highlights if annotation else []}
+
+    def save_annotations(
+        self,
+        session: Session,
+        material_id: UUID,
+        requesting_user_id: int,
+        highlights: list,
+    ) -> dict:
+        material = MaterialRepository(session).get_by_public_id(material_id)
+        if not material:
+            raise LookupError("Material no encontrado")
+
+        user = UserRepository(session).get_by_id(requesting_user_id)
+
+        if len(highlights) > 500:
+            raise ValueError("Máximo 500 anotaciones por documento")
+
+        annotation = PDFAnnotationRepository(session).upsert(
+            user.id, material.id, highlights
+        )
+        return {"highlights": annotation.highlights}

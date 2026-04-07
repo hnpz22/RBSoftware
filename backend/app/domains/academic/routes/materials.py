@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile, status
 from sqlmodel import Session
 
 from app.core.database import get_session
@@ -152,3 +154,31 @@ def download_material(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
+@router.get("/materials/{material_id}/annotations")
+def get_annotations(
+    material_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return _svc.get_annotations(session, material_id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+
+
+@router.put("/materials/{material_id}/annotations")
+def save_annotations(
+    material_id: UUID,
+    body: dict[str, Any] = Body(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    highlights = body.get("highlights", [])
+    try:
+        return _svc.save_annotations(session, material_id, current_user.id, highlights)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))

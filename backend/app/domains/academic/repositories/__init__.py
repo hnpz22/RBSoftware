@@ -6,6 +6,7 @@ from app.domains.academic.repositories.course_student_repository import CourseSt
 from app.domains.academic.repositories.grade_director_repository import GradeDirectorRepository
 from app.domains.academic.repositories.grade_repository import GradeRepository
 from app.domains.academic.repositories.material_repository import MaterialRepository
+from app.domains.academic.repositories.pdf_annotation_repository import PDFAnnotationRepository
 from app.domains.academic.repositories.school_repository import SchoolRepository
 from app.domains.academic.repositories.school_teacher_repository import SchoolTeacherRepository
 from app.domains.academic.repositories.submission_repository import SubmissionRepository
@@ -20,6 +21,7 @@ __all__ = [
     "CourseStudentRepository",
     "UnitRepository",
     "MaterialRepository",
+    "PDFAnnotationRepository",
     "AssignmentRepository",
     "SubmissionRepository",
 ]

@@ -5,7 +5,7 @@ import { AlertCircle, Download, FileText, Image as ImageIcon, Loader2, X } from 
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import { useAuthStore } from '@/lib/store'
-import { AdobePDFViewer } from './adobe-pdf-viewer'
+import { PDFHighlighterViewer } from './pdf-highlighter'
 
 interface Props {
   isOpen: boolean
@@ -146,21 +146,19 @@ export function FileViewerModal({
             </div>
           )}
 
-          {!loading && !error && url && resolvedType === 'PDF' && (
+          {!loading && !error && url && resolvedType === 'PDF' && materialId && (
             <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="flex-1">
-                <AdobePDFViewer url={url} fileName={fileName} height="100%" />
-              </div>
-              <div className="py-2 text-center md:hidden">
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline"
-                >
-                  Abrir en nueva pestaña →
-                </a>
-              </div>
+              <PDFHighlighterViewer url={url} materialId={materialId} fileName={fileName} />
+            </div>
+          )}
+
+          {!loading && !error && url && resolvedType === 'PDF' && !materialId && (
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <iframe
+                src={`${url}#toolbar=0&navpanes=0`}
+                className="w-full h-full border-0"
+                title={fileName}
+              />
             </div>
           )}
 
@@ -179,7 +177,12 @@ export function FileViewerModal({
 
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-3">
-          <div>
+          <div className="flex items-center gap-2">
+            {materialId && resolvedType === 'PDF' && (
+              <span className="text-xs text-muted-foreground">
+                Tus anotaciones se guardan automáticamente
+              </span>
+            )}
             {resolvedType && (
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
