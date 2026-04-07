@@ -9,6 +9,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Factory,
   GraduationCap,
   Layers,
@@ -75,8 +76,13 @@ export function Nav() {
     {
       title: 'Capacitación',
       items: [
-        { href: '/training/programs',     label: 'Programas',        icon: GraduationCap, visible: () => isAdmin() || hasRole('TRAINER') },
-        { href: '/training/my-programs',  label: 'Mis Programas',    icon: BookOpenCheck, visible: () => hasRole('TEACHER') },
+        {
+          href: hasRole('TEACHER') && !isAdmin() && !hasRole('TRAINER') ? '/training/my-programs' : '/training/programs',
+          label: 'Mis Programas',
+          icon: BookOpenCheck,
+          visible: () => isAdmin() || hasRole('TRAINER') || hasRole('TEACHER'),
+        },
+        { href: '/training/grading',      label: 'Calificaciones',   icon: ClipboardList, visible: () => isAdmin() || hasRole('TRAINER') },
         { href: '/training/certificates', label: 'Mis Certificados', icon: Award,         visible: () => hasRole('TEACHER') },
       ],
     },
