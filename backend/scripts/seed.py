@@ -320,7 +320,6 @@ def seed_training(session: Session) -> None:
         print(f"  [ok]   usuario '{trainer_data['email']}' creado")
 
     # — Programa —
-    admin = session.exec(select(User).where(User.email == "admin@robotschool.com")).first()
     program = session.exec(
         select(TrainingProgram).where(
             TrainingProgram.name == "Capacitación en Robótica Educativa"
@@ -328,6 +327,12 @@ def seed_training(session: Session) -> None:
     ).first()
     if program:
         print("  [skip] programa 'Capacitación en Robótica Educativa' ya existe")
+        if program.created_by != trainer.id:
+            program.created_by = trainer.id
+            session.add(program)
+            session.commit()
+            session.refresh(program)
+            print("  [updated] created_by → trainer")
     else:
         program = TrainingProgram(
             name="Capacitación en Robótica Educativa",
@@ -336,7 +341,7 @@ def seed_training(session: Session) -> None:
             duration_hours=20,
             is_active=True,
             is_published=True,
-            created_by=admin.id if admin else None,
+            created_by=trainer.id,
         )
         session.add(program)
         session.commit()
@@ -463,7 +468,7 @@ def seed_training(session: Session) -> None:
         enrollment = TrainingEnrollment(
             program_id=program.id,
             user_id=docente.id,
-            enrolled_by=admin.id if admin else None,
+            enrolled_by=trainer.id,
             enrolled_at=datetime.now(timezone.utc),
         )
         session.add(enrollment)
