@@ -99,7 +99,7 @@ class TrainingService:
         requesting_user_id: int,
         publish: bool = True,
     ):
-        self._assert_admin(session, requesting_user_id)
+        self._assert_admin_or_trainer(session, requesting_user_id)
         program = ProgramRepository(session).get_by_public_id(program_id)
         if program is None:
             raise LookupError("Programa no encontrado")

@@ -31,8 +31,10 @@ def list_programs(
     current_user: User = Depends(get_current_user),
 ):
     role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" in role_names or "TRAINER" in role_names:
+    if "ADMIN" in role_names:
         programs = ProgramRepository(session).list_active()
+    elif "TRAINER" in role_names:
+        programs = ProgramRepository(session).list_by_creator(current_user.id)
     else:
         enrollments = EnrollmentRepository(session).list_by_user(current_user.id)
         program_ids = [e.program_id for e in enrollments]
@@ -93,7 +95,7 @@ def update_program(
 def publish_program(
     program_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
 ):
     try:
         _svc.publish_program(session, program_id, current_user.id, publish=True)

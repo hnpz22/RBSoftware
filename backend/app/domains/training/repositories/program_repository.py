@@ -27,6 +27,17 @@ class ProgramRepository:
         )
         return list(self.session.exec(stmt).all())
 
+    def list_by_creator(self, created_by: int) -> list[TrainingProgram]:
+        stmt = (
+            select(TrainingProgram)
+            .where(
+                TrainingProgram.is_active.is_(True),
+                TrainingProgram.created_by == created_by,
+            )
+            .order_by(TrainingProgram.name)
+        )
+        return list(self.session.exec(stmt).all())
+
     def list_published(self) -> list[TrainingProgram]:
         stmt = (
             select(TrainingProgram)
