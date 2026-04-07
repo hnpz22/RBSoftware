@@ -541,6 +541,92 @@ class TrainingService:
         )
         return certificate
 
+    # ── Gradebook ─────────────────────────────────────────────────────────────
+
+    def get_training_gradebook(
+        self,
+        session: Session,
+        program_id: UUID,
+        requesting_user_id: int,
+    ) -> dict:
+        program = ProgramRepository(session).get_by_public_id(program_id)
+        if program is None:
+            raise LookupError("Programa no encontrado")
+
+        if not self._is_admin(session, requesting_user_id):
+            roles = self._get_roles(session, requesting_user_id)
+            if "TRAINER" not in roles or program.created_by != requesting_user_id:
+                raise PermissionError("Solo ADMIN o el TRAINER creador pueden ver la planilla")
+
+        modules = ModuleRepository(session).list_by_program(program.id)
+        evaluations = []
+        for mod in modules:
+            evaluations.extend(EvaluationRepository(session).list_by_module(mod.id))
+
+        enrollments = EnrollmentRepository(session).list_by_program(program.id)
+        sub_repo = SubmissionRepository(session)
+        cert_repo = CertificateRepository(session)
+
+        result_teachers = []
+        for enrollment in enrollments:
+            from app.domains.auth.repositories import UserRepository
+
+            teacher = UserRepository(session).get_by_id(enrollment.user_id)
+            if teacher is None:
+                continue
+
+            grades: dict = {}
+            scores: list[int] = []
+
+            for ev in evaluations:
+                sub = sub_repo.get_by_user_and_evaluation(enrollment.user_id, ev.id)
+                if sub and sub.score is not None:
+                    grades[str(ev.public_id)] = {
+                        "score": sub.score,
+                        "status": sub.status,
+                        "submission_id": str(sub.public_id),
+                        "type": ev.type,
+                    }
+                    scores.append(sub.score)
+                else:
+                    grades[str(ev.public_id)] = None
+
+            average = round(sum(scores) / len(scores), 1) if scores else None
+
+            result_teachers.append(
+                {
+                    "teacher": {
+                        "public_id": str(teacher.public_id),
+                        "first_name": teacher.first_name,
+                        "last_name": teacher.last_name,
+                        "email": teacher.email,
+                    },
+                    "grades": grades,
+                    "average": average,
+                    "completed": len(scores),
+                    "total": len(evaluations),
+                    "is_certified": cert_repo.get_by_enrollment(enrollment.id) is not None,
+                }
+            )
+
+        return {
+            "program": {
+                "public_id": str(program.public_id),
+                "name": program.name,
+            },
+            "evaluations": [
+                {
+                    "public_id": str(e.public_id),
+                    "title": e.title,
+                    "type": e.type,
+                    "max_score": e.max_score,
+                    "passing_score": e.passing_score,
+                }
+                for e in evaluations
+            ],
+            "teachers": result_teachers,
+        }
+
     # ── Teacher progress view ────────────────────────────────────────────────
 
     def get_my_programs(

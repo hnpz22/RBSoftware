@@ -107,6 +107,20 @@ def publish_program(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
 
 
+@router.get("/programs/{program_id}/gradebook")
+def get_gradebook(
+    program_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+):
+    try:
+        return _svc.get_training_gradebook(session, program_id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
 @router.get("/programs/{program_id}/progress")
 def get_program_progress(
     program_id: UUID,
