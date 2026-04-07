@@ -14,16 +14,18 @@ import {
   Layers,
   LayoutDashboard,
   LogOut,
+  Moon,
   Package,
   PackageCheck,
   Plug,
   Shield,
   ShoppingCart,
+  Sun,
   Users2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
-import { useAuthStore, useSidebarStore } from '@/lib/store'
+import { useAuthStore, useSidebarStore, useThemeStore } from '@/lib/store'
 
 // ── Nav structure ───────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ export function Nav() {
   const router = useRouter()
   const { user, setUser, hasRole, isAdmin } = useAuthStore()
   const { open, collapsed, setOpen, toggleCollapsed } = useSidebarStore()
+  const { theme, toggleTheme } = useThemeStore()
 
   const sections: NavSection[] = [
     {
@@ -239,17 +242,29 @@ export function Nav() {
             </div>
           </div>
         )}
-        <button
-          onClick={handleLogout}
-          className={cn(
-            'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-blue-100 transition-colors hover:bg-blue-800 hover:text-white',
-            collapsed && 'md:justify-center md:px-0',
-          )}
-          title={collapsed ? 'Cerrar sesión' : undefined}
-        >
-          <LogOut size={16} />
-          <span className={cn(collapsed && 'md:hidden')}>Cerrar sesión</span>
-        </button>
+        <div className={cn(
+          'flex items-center gap-1',
+          collapsed && 'md:flex-col',
+        )}>
+          <button
+            onClick={handleLogout}
+            className={cn(
+              'flex flex-1 items-center gap-2 rounded-md px-3 py-2 text-sm text-blue-100 transition-colors hover:bg-blue-800 hover:text-white',
+              collapsed && 'md:justify-center md:px-0 md:flex-none',
+            )}
+            title={collapsed ? 'Cerrar sesión' : undefined}
+          >
+            <LogOut size={16} />
+            <span className={cn(collapsed && 'md:hidden')}>Cerrar sesión</span>
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="rounded-md p-2 text-blue-300 transition-colors hover:bg-blue-800 hover:text-white"
+            title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
 
         <button
           onClick={toggleCollapsed}

@@ -4,20 +4,21 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
+  ArrowRight,
   Award,
   BookOpen,
   Check,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  ClipboardCheck,
+  Circle,
+  ClipboardList,
   FileText,
+  Menu,
   Send,
   Video,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import type { TrainingProgram, TeacherProgramProgress } from '@/lib/types'
+import type { TrainingProgram } from '@/lib/types'
 import type {
   TrainingModule,
   TrainingLesson,
@@ -27,293 +28,453 @@ import type {
 } from '@/services/training'
 import * as trainingService from '@/services/training'
 
+// ── Types ───────────────────────────────────────────────────────────────────
+
+interface FlatLesson extends TrainingLesson {
+  moduleTitle: string
+  moduleIndex: number
+  flatIndex: number
+}
+
+interface ModuleEvals {
+  moduleId: string
+  evaluations: TrainingEvaluation[]
+}
+
 interface Props {
   program: TrainingProgram
   modules: TrainingModule[]
   reload: () => void
 }
 
+// ── Main component ──────────────────────────────────────────────────────────
+
 export function TeacherProgramView({ program, modules }: Props) {
   const router = useRouter()
-  const [progress, setProgress] = useState<TeacherProgramProgress | null>(null)
-
-  useEffect(() => {
-    trainingService.getMyPrograms().then((progs) => {
-      const found = progs.find((p) => p.program_id === program.public_id)
-      if (found) setProgress(found)
-    }).catch(() => {})
-  }, [program.public_id])
-
-  const lessonPct = progress && progress.total_lessons > 0
-    ? Math.round((progress.completed_lessons / progress.total_lessons) * 100) : 0
-
   const publishedModules = modules.filter((m) => m.is_published)
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <button
-          onClick={() => router.push('/training/my-programs')}
-          className="mb-2 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
+  const [allLessons, setAllLessons] = useState<FlatLesson[]>([])
+  const [moduleEvals, setModuleEvals] = useState<ModuleEvals[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [completedSet, setCompletedSet] = useState<Set<string>>(new Set())
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [loading, setLoading] = useState(true)
+
+  // Load all content on mount
+  useEffect(() => {
+    async function loadAll() {
+      setLoading(true)
+      const flat: FlatLesson[] = []
+      const evals: ModuleEvals[] = []
+      let idx = 0
+
+      for (let mi = 0; mi < publishedModules.length; mi++) {
+        const mod = publishedModules[mi]
+        const [lessons, evaluations] = await Promise.all([
+          trainingService.listLessons(mod.public_id),
+          trainingService.listEvaluations(mod.public_id),
+        ])
+        const published = lessons.filter((l) => l.is_published)
+        for (const l of published) {
+          flat.push({ ...l, moduleTitle: mod.title, moduleIndex: mi, flatIndex: idx })
+          idx++
+        }
+        const pubEvals = evaluations.filter((e) => e.is_published)
+        if (pubEvals.length > 0) {
+          evals.push({ moduleId: mod.public_id, evaluations: pubEvals })
+        }
+      }
+
+      setAllLessons(flat)
+      setModuleEvals(evals)
+      setLoading(false)
+    }
+    if (publishedModules.length > 0) loadAll()
+    else setLoading(false)
+  }, [])
+
+  const currentLesson = allLessons[currentIndex] ?? null
+  const totalLessons = allLessons.length
+  const completedCount = completedSet.size
+  const progressPct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
+  const isCurrentCompleted = currentLesson ? completedSet.has(currentLesson.public_id) : false
+
+  // Find evaluations for current module
+  const currentModuleId = currentLesson
+    ? publishedModules[currentLesson.moduleIndex]?.public_id
+    : null
+  const currentModuleEvalData = moduleEvals.find((me) => me.moduleId === currentModuleId)
+  const isLastLessonOfModule = currentLesson
+    ? !allLessons[currentIndex + 1] || allLessons[currentIndex + 1].moduleIndex !== currentLesson.moduleIndex
+    : false
+
+  function goNext() {
+    if (currentIndex < totalLessons - 1) {
+      setCurrentIndex((i) => i + 1)
+      window.scrollTo(0, 0)
+    }
+  }
+
+  function goPrev() {
+    if (currentIndex > 0) {
+      setCurrentIndex((i) => i - 1)
+      window.scrollTo(0, 0)
+    }
+  }
+
+  async function markComplete() {
+    if (!currentLesson || isCurrentCompleted) return
+    try {
+      await trainingService.completeLesson(currentLesson.public_id)
+      setCompletedSet((prev) => new Set([...prev, currentLesson.public_id]))
+      goNext()
+    } catch {}
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-20 text-muted-foreground">Cargando programa…</div>
+  }
+
+  if (totalLessons === 0) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => router.push('/training/my-programs')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft size={14} /> Mis Programas
         </button>
-        <h1 className="text-2xl font-semibold">{program.name}</h1>
-        {program.description && (
-          <p className="mt-1 text-sm text-muted-foreground">{program.description}</p>
-        )}
+        <p className="py-12 text-center text-muted-foreground">No hay contenido publicado en este programa</p>
+      </div>
+    )
+  }
+
+  // Group lessons by module for sidebar
+  const moduleGroups: { title: string; lessons: FlatLesson[] }[] = []
+  for (const l of allLessons) {
+    if (!moduleGroups[l.moduleIndex]) {
+      moduleGroups[l.moduleIndex] = { title: l.moduleTitle, lessons: [] }
+    }
+    moduleGroups[l.moduleIndex].lessons.push(l)
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* ── Sticky header ── */}
+      <div className="sticky top-0 z-10 shrink-0 border-b bg-background/95 backdrop-blur px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="rounded-md p-1 hover:bg-muted md:hidden"
+            >
+              <Menu size={18} />
+            </button>
+            <button
+              onClick={() => router.push('/training/my-programs')}
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft size={14} /> Mis Programas
+            </button>
+          </div>
+          <span className="text-sm font-medium truncate max-w-[200px] sm:max-w-none">{program.name}</span>
+        </div>
+        <div className="mt-2">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <span>{completedCount} de {totalLessons} lecciones</span>
+            <span>{progressPct}%</span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
       </div>
 
-      {/* Progress bar */}
-      {progress && (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Progreso general</span>
-            <span className="font-medium">
-              {progress.completed_lessons} de {progress.total_lessons} lecciones · {progress.passed_evaluations} de {progress.total_evaluations} evaluaciones
-            </span>
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Sidebar ── */}
+        <div className={`${sidebarOpen ? 'block' : 'hidden'} md:block w-72 shrink-0 border-r bg-muted/20 overflow-y-auto`}>
+          <div className="p-3">
+            {moduleGroups.map((group, gi) => (
+              <div key={gi} className="mb-4">
+                <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Módulo {gi + 1}
+                </p>
+                <p className="px-2 mb-2 text-xs font-medium text-muted-foreground truncate">{group.title}</p>
+                {group.lessons.map((l) => {
+                  const isActive = l.flatIndex === currentIndex
+                  const isDone = completedSet.has(l.public_id)
+                  return (
+                    <button
+                      key={l.public_id}
+                      onClick={() => { setCurrentIndex(l.flatIndex); setSidebarOpen(false) }}
+                      className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors mb-0.5 ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground font-medium'
+                          : 'hover:bg-muted'
+                      }`}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 size={14} className={isActive ? 'text-primary-foreground' : 'text-green-500'} />
+                      ) : (
+                        <Circle size={14} className={isActive ? 'text-primary-foreground/60' : 'text-muted-foreground/40'} />
+                      )}
+                      <span className="truncate">{l.title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
           </div>
-          <div className="h-2 rounded-full bg-muted">
-            <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${lessonPct}%` }} />
-          </div>
+
+          {/* Certificate card in sidebar */}
+          <CertificateStatus programId={program.public_id} />
         </div>
-      )}
 
-      {publishedModules.length === 0 && (
-        <p className="py-12 text-center text-muted-foreground">No hay contenido publicado</p>
-      )}
+        {/* ── Main content ── */}
+        <div className="flex-1 overflow-y-auto">
+          {currentLesson && (
+            <div className="max-w-3xl mx-auto px-6 py-8">
+              {/* Lesson header */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <span>{currentLesson.moduleTitle}</span>
+                  <span>·</span>
+                  {currentLesson.type === 'PDF' && <FileText size={14} className="text-red-500" />}
+                  {currentLesson.type === 'VIDEO' && <Video size={14} className="text-blue-500" />}
+                  {currentLesson.type === 'TEXT' && <BookOpen size={14} />}
+                  <span>{currentLesson.type}</span>
+                  {currentLesson.duration_minutes && (
+                    <>
+                      <span>·</span>
+                      <span>{currentLesson.duration_minutes} min</span>
+                    </>
+                  )}
+                </div>
+                <h1 className="text-2xl font-bold">{currentLesson.title}</h1>
+              </div>
 
-      {/* Modules */}
-      {publishedModules.map((mod) => (
-        <TeacherModuleSection
-          key={mod.public_id}
-          module={mod}
-          programId={program.public_id}
-          onProgressChanged={() => {
-            trainingService.getMyPrograms().then((progs) => {
-              const found = progs.find((p) => p.program_id === program.public_id)
-              if (found) setProgress(found)
-            })
-          }}
-        />
-      ))}
+              {/* Content by type */}
+              {currentLesson.type === 'TEXT' && currentLesson.content && (
+                <div className="prose prose-lg dark:prose-invert max-w-none">
+                  <p className="whitespace-pre-wrap leading-relaxed">{currentLesson.content}</p>
+                </div>
+              )}
 
-      {/* Certificate */}
-      {progress?.is_certified && progress.certificate_code && (
-        <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
-          <Award size={24} className="text-green-600" />
-          <div>
-            <p className="font-medium text-green-700 dark:text-green-400">Certificado obtenido</p>
-            <p className="text-sm text-green-600 dark:text-green-500">Código: {progress.certificate_code}</p>
-          </div>
+              {currentLesson.type === 'PDF' && currentLesson.file_key && (
+                <LessonPdfViewer lessonId={currentLesson.public_id} />
+              )}
+
+              {currentLesson.type === 'VIDEO' && (
+                <LessonVideoPlayer lesson={currentLesson} />
+              )}
+
+              {/* Evaluation card at end of module */}
+              {isLastLessonOfModule && currentModuleEvalData && (
+                <div className="mt-10 rounded-xl border-2 border-primary/20 bg-primary/5 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                      <ClipboardList size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Evaluación del módulo</h3>
+                      <p className="text-sm text-muted-foreground">Completa la evaluación para avanzar</p>
+                    </div>
+                  </div>
+                  {currentModuleEvalData.evaluations.map((ev) => (
+                    <EvaluationCard key={ev.public_id} evaluation={ev} />
+                  ))}
+                </div>
+              )}
+
+              {/* Bottom navigation */}
+              <div className="flex items-center justify-between mt-12 pt-6 border-t">
+                <button
+                  onClick={goPrev}
+                  disabled={currentIndex === 0}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ArrowLeft size={16} /> Anterior
+                </button>
+
+                <button
+                  onClick={markComplete}
+                  disabled={isCurrentCompleted}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
+                    isCurrentCompleted
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }`}
+                >
+                  {isCurrentCompleted ? (
+                    <><CheckCircle2 size={16} /> Completada</>
+                  ) : (
+                    <><Check size={16} /> Marcar completada</>
+                  )}
+                </button>
+
+                <button
+                  onClick={goNext}
+                  disabled={currentIndex === totalLessons - 1}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Siguiente <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// ── Module section ──────────────────────────────────────────────────────────
+// ── PDF Viewer ──────────────────────────────────────────────────────────────
 
-function TeacherModuleSection({ module: mod, programId, onProgressChanged }: {
-  module: TrainingModule; programId: string; onProgressChanged: () => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [lessons, setLessons] = useState<TrainingLesson[]>([])
-  const [evaluations, setEvaluations] = useState<TrainingEvaluation[]>([])
-  const [loaded, setLoaded] = useState(false)
+function LessonPdfViewer({ lessonId }: { lessonId: string }) {
+  const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    if (expanded && !loaded) {
-      Promise.all([
-        trainingService.listLessons(mod.public_id),
-        trainingService.listEvaluations(mod.public_id),
-      ]).then(([l, e]) => {
-        setLessons(l.filter((x) => x.is_published))
-        setEvaluations(e.filter((x) => x.is_published))
-        setLoaded(true)
-      })
-    }
-  }, [expanded, loaded, mod.public_id])
+    trainingService.getLessonViewUrl(lessonId)
+      .then((data) => setUrl(data.url))
+      .catch(() => {})
+  }, [lessonId])
+
+  if (!url) return <div className="h-[70vh] rounded-lg border flex items-center justify-center text-muted-foreground">Cargando PDF…</div>
 
   return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/30"
-      >
-        <div className="flex items-center gap-2">
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <h2 className="font-medium">{mod.title}</h2>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="border-t px-4 py-3 space-y-4">
-          {/* Lessons */}
-          {lessons.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Lecciones ({lessons.length})
-              </p>
-              {lessons.map((l) => (
-                <TeacherLessonItem key={l.public_id} lesson={l} onCompleted={onProgressChanged} />
-              ))}
-            </div>
-          )}
-
-          {/* Evaluations */}
-          {evaluations.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Evaluaciones ({evaluations.length})
-              </p>
-              {evaluations.map((ev) => (
-                <TeacherEvaluationItem key={ev.public_id} evaluation={ev} onSubmitted={onProgressChanged} />
-              ))}
-            </div>
-          )}
-
-          {lessons.length === 0 && evaluations.length === 0 && (
-            <p className="text-sm text-muted-foreground">Sin contenido</p>
-          )}
-        </div>
-      )}
-    </div>
+    <iframe src={url} className="h-[70vh] w-full rounded-lg border" />
   )
 }
 
-// ── Lesson item ─────────────────────────────────────────────────────────────
+// ── Video Player ────────────────────────────────────────────────────────────
 
-function TeacherLessonItem({ lesson, onCompleted }: { lesson: TrainingLesson; onCompleted: () => void }) {
-  const [completed, setCompleted] = useState(false)
-  const [marking, setMarking] = useState(false)
-  const [viewUrl, setViewUrl] = useState<string | null>(null)
+function LessonVideoPlayer({ lesson }: { lesson: TrainingLesson }) {
+  const [url, setUrl] = useState<string | null>(null)
 
-  async function handleComplete() {
-    setMarking(true)
-    try {
-      await trainingService.completeLesson(lesson.public_id)
-      setCompleted(true)
-      onCompleted()
-    } catch {}
-    finally { setMarking(false) }
+  useEffect(() => {
+    if (lesson.file_key) {
+      trainingService.getLessonViewUrl(lesson.public_id)
+        .then((data) => setUrl(data.url))
+        .catch(() => {})
+    }
+  }, [lesson.public_id, lesson.file_key])
+
+  // YouTube embed
+  if (lesson.content && /youtu(be\.com|\.be)/.test(lesson.content)) {
+    const match = lesson.content.match(/(?:v=|\.be\/)([a-zA-Z0-9_-]{11})/)
+    const videoId = match?.[1]
+    if (videoId) {
+      return (
+        <div className="aspect-video rounded-lg overflow-hidden bg-black">
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}`}
+            className="w-full h-full"
+            allowFullScreen
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          />
+        </div>
+      )
+    }
   }
 
-  async function handleView() {
-    try {
-      const data = await trainingService.getLessonViewUrl(lesson.public_id)
-      window.open(data.url, '_blank')
-    } catch {}
+  // Uploaded video
+  if (url) {
+    return (
+      <div className="aspect-video rounded-lg overflow-hidden bg-black">
+        <video src={url} controls className="w-full h-full" />
+      </div>
+    )
   }
+
+  return <p className="py-8 text-center text-muted-foreground">Video no disponible</p>
+}
+
+// ── Certificate status ──────────────────────────────────────────────────────
+
+function CertificateStatus({ programId }: { programId: string }) {
+  const [progress, setProgress] = useState<{ is_certified: boolean; certificate_code: string | null } | null>(null)
+
+  useEffect(() => {
+    trainingService.getMyPrograms()
+      .then((progs) => {
+        const found = progs.find((p) => p.program_id === programId)
+        if (found) setProgress({ is_certified: found.is_certified, certificate_code: found.certificate_code })
+      })
+      .catch(() => {})
+  }, [programId])
+
+  if (!progress?.is_certified) return null
 
   return (
-    <div className="rounded-md border p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {lesson.type === 'PDF' && <FileText size={16} className="text-red-500" />}
-          {lesson.type === 'VIDEO' && <Video size={16} className="text-blue-500" />}
-          {lesson.type === 'TEXT' && <BookOpen size={16} className="text-muted-foreground" />}
-          <div>
-            <p className="text-sm font-medium">{lesson.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {lesson.type}{lesson.duration_minutes ? ` · ${lesson.duration_minutes} min` : ''}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {(lesson.type === 'PDF' || lesson.type === 'VIDEO') && lesson.file_key && (
-            <Button variant="outline" size="sm" onClick={handleView}>Ver</Button>
-          )}
-          {completed ? (
-            <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={14} /> Completada</span>
-          ) : (
-            <Button variant="outline" size="sm" disabled={marking} onClick={handleComplete}>
-              <Check size={13} className="mr-1" /> {marking ? 'Marcando…' : 'Completar'}
-            </Button>
-          )}
+    <div className="mx-3 mb-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+      <div className="flex items-center gap-2">
+        <Award size={18} className="text-green-600 shrink-0" />
+        <div>
+          <p className="text-xs font-medium text-green-700 dark:text-green-400">Certificado</p>
+          <p className="text-[10px] text-green-600 dark:text-green-500">{progress.certificate_code}</p>
         </div>
       </div>
-      {lesson.type === 'TEXT' && lesson.content && (
-        <div className="mt-2 rounded bg-muted/50 p-3 text-sm text-muted-foreground whitespace-pre-wrap">
-          {lesson.content}
-        </div>
-      )}
     </div>
   )
 }
 
-// ── Evaluation item ─────────────────────────────────────────────────────────
+// ── Evaluation card ─────────────────────────────────────────────────────────
 
-function TeacherEvaluationItem({ evaluation, onSubmitted }: { evaluation: TrainingEvaluation; onSubmitted: () => void }) {
+function EvaluationCard({ evaluation }: { evaluation: TrainingEvaluation }) {
   const [submission, setSubmission] = useState<TrainingSubmission | null>(null)
-  const [loadedSub, setLoadedSub] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
   const [showPractical, setShowPractical] = useState(false)
 
   useEffect(() => {
     trainingService.getMySubmission(evaluation.public_id)
-      .then((s) => { setSubmission(s); setLoadedSub(true) })
-      .catch(() => setLoadedSub(true))
+      .then((s) => { setSubmission(s); setLoaded(true) })
+      .catch(() => setLoaded(true))
   }, [evaluation.public_id])
 
   const isGraded = submission?.status === 'GRADED'
   const passed = isGraded && submission.score !== null && submission.score >= evaluation.passing_score
 
   return (
-    <div className="rounded-md border p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ClipboardCheck size={16} className="text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">{evaluation.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {evaluation.type === 'QUIZ' ? 'Quiz' : 'Práctica'} · Aprueba con {evaluation.passing_score}/{evaluation.max_score}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="mt-3">
+      <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+        <div>
+          <p className="font-medium">{evaluation.title}</p>
+          <p className="text-xs text-muted-foreground">
+            {evaluation.type === 'QUIZ' ? 'Quiz' : 'Práctica'} · Aprueba con {evaluation.passing_score}/{evaluation.max_score}
+          </p>
           {isGraded && (
-            <span className={`text-xs font-medium ${passed ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`mt-1 text-sm font-medium ${passed ? 'text-green-600' : 'text-red-600'}`}>
               {submission.score}/{evaluation.max_score} — {passed ? 'Aprobado' : 'No aprobado'}
-            </span>
+            </p>
           )}
           {submission?.status === 'SUBMITTED' && (
-            <span className="text-xs text-yellow-600">Pendiente de calificación</span>
+            <p className="mt-1 text-xs text-yellow-600">Pendiente de calificación</p>
           )}
+          {isGraded && submission.feedback && (
+            <p className="mt-1 text-xs text-muted-foreground">Feedback: {submission.feedback}</p>
+          )}
+        </div>
+        <div>
           {!isGraded && evaluation.type === 'QUIZ' && (
-            <Button size="sm" onClick={() => setShowQuiz(true)}>Hacer quiz</Button>
+            <Button onClick={() => setShowQuiz(true)}>Hacer quiz</Button>
           )}
           {!isGraded && evaluation.type === 'PRACTICAL' && submission?.status !== 'SUBMITTED' && (
-            <Button size="sm" onClick={() => setShowPractical(true)}>Entregar</Button>
+            <Button onClick={() => setShowPractical(true)}>Entregar</Button>
           )}
+          {passed && <CheckCircle2 size={24} className="text-green-500" />}
         </div>
       </div>
 
-      {/* Feedback */}
-      {isGraded && submission.feedback && (
-        <div className="mt-2 rounded bg-muted/50 p-2 text-sm text-muted-foreground">
-          <span className="font-medium">Retroalimentación:</span> {submission.feedback}
-        </div>
-      )}
-
-      {/* Quiz modal */}
       {showQuiz && (
         <QuizModal
-          evaluationId={evaluation.public_id}
-          passingScore={evaluation.passing_score}
-          maxScore={evaluation.max_score}
+          evaluation={evaluation}
           onClose={() => setShowQuiz(false)}
-          onSubmitted={(sub) => { setSubmission(sub); setShowQuiz(false); onSubmitted() }}
+          onSubmitted={(sub) => { setSubmission(sub); setShowQuiz(false) }}
         />
       )}
-
-      {/* Practical modal */}
       {showPractical && (
         <PracticalModal
           evaluationId={evaluation.public_id}
           onClose={() => setShowPractical(false)}
-          onSubmitted={(sub) => { setSubmission(sub); setShowPractical(false); onSubmitted() }}
+          onSubmitted={(sub) => { setSubmission(sub); setShowPractical(false) }}
         />
       )}
     </div>
@@ -322,9 +483,10 @@ function TeacherEvaluationItem({ evaluation, onSubmitted }: { evaluation: Traini
 
 // ── Quiz Modal ──────────────────────────────────────────────────────────────
 
-function QuizModal({ evaluationId, passingScore, maxScore, onClose, onSubmitted }: {
-  evaluationId: string; passingScore: number; maxScore: number
-  onClose: () => void; onSubmitted: (s: TrainingSubmission) => void
+function QuizModal({ evaluation, onClose, onSubmitted }: {
+  evaluation: TrainingEvaluation
+  onClose: () => void
+  onSubmitted: (s: TrainingSubmission) => void
 }) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [answers, setAnswers] = useState<Record<string, number>>({})
@@ -334,75 +496,116 @@ function QuizModal({ evaluationId, passingScore, maxScore, onClose, onSubmitted 
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    trainingService.listQuestions(evaluationId)
+    trainingService.listQuestions(evaluation.public_id)
       .then((q) => { setQuestions(q); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [evaluationId])
+  }, [evaluation.public_id])
 
   async function handleSubmit() {
     setError(null); setSubmitting(true)
     try {
-      const sub = await trainingService.submitQuiz(evaluationId, answers)
+      const sub = await trainingService.submitQuiz(evaluation.public_id, answers)
       setResult(sub)
     } catch (err: any) { setError(err?.detail ?? 'Error al enviar') }
     finally { setSubmitting(false) }
   }
 
-  const allAnswered = questions.every((q) => answers[q.public_id] !== undefined)
+  const answeredCount = Object.keys(answers).length
+  const totalQuestions = questions.length
+  const passed = result?.score !== null && result?.score !== undefined && result.score >= evaluation.passing_score
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-lg border bg-card shadow-xl">
-        <div className="sticky top-0 flex items-center justify-between border-b bg-card px-5 py-4">
-          <h3 className="font-semibold">{result ? 'Resultado' : 'Quiz'}</h3>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl bg-card shadow-2xl">
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
+          <h2 className="text-lg font-bold">{evaluation.title}</h2>
           <button onClick={() => { if (result) onSubmitted(result); else onClose() }} className="rounded-md p-1 hover:bg-muted">
-            <span className="sr-only">Cerrar</span>✕
+            <X size={20} />
           </button>
         </div>
 
-        {loading && <p className="p-8 text-center text-muted-foreground">Cargando…</p>}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading && (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-b-primary" />
+            </div>
+          )}
 
-        {!loading && !result && (
-          <div className="space-y-4 p-5">
-            {questions.map((q, i) => (
-              <div key={q.public_id} className="space-y-2">
-                <p className="text-sm font-medium">{i + 1}. {q.question} <span className="text-xs text-muted-foreground">({q.points} pts)</span></p>
-                <div className="space-y-1 pl-4">
-                  {q.options.map((opt) => (
-                    <label key={opt.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/50">
-                      <input
-                        type="radio"
-                        name={`q-${q.public_id}`}
-                        checked={answers[q.public_id] === opt.id}
-                        onChange={() => setAnswers({ ...answers, [q.public_id]: opt.id })}
-                        className="accent-primary"
-                      />
-                      {opt.text}
-                    </label>
-                  ))}
+          {/* Result screen */}
+          {result && (
+            <div className={`py-8 text-center ${passed ? 'text-green-600' : 'text-destructive'}`}>
+              <div className="mb-4 text-6xl">{passed ? '🎉' : '😔'}</div>
+              <h3 className="mb-2 text-2xl font-bold">{passed ? '¡Aprobaste!' : 'No aprobaste'}</h3>
+              <p className="mb-2 text-4xl font-bold">{result.score}/{evaluation.max_score}</p>
+              {!passed && (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Necesitas {evaluation.passing_score}/{evaluation.max_score} para aprobar. Puedes intentarlo de nuevo.
+                </p>
+              )}
+              <button
+                onClick={() => onSubmitted(result)}
+                className="mt-6 rounded-lg bg-primary px-6 py-2 font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                {passed ? 'Continuar →' : 'Cerrar'}
+              </button>
+            </div>
+          )}
+
+          {/* Questions */}
+          {!loading && !result && (
+            <div className="space-y-8">
+              {questions.map((q, idx) => (
+                <div key={q.public_id}>
+                  <p className="mb-3 font-medium">
+                    {idx + 1}. {q.question}
+                    <span className="ml-2 text-xs text-muted-foreground">({q.points} pts)</span>
+                  </p>
+                  <div className="space-y-2">
+                    {q.options.map((opt) => {
+                      const selected = answers[q.public_id] === opt.id
+                      return (
+                        <label
+                          key={opt.id}
+                          className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                            selected
+                              ? 'border-primary bg-primary/5'
+                              : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={q.public_id}
+                            checked={selected}
+                            onChange={() => setAnswers((prev) => ({ ...prev, [q.public_id]: opt.id }))}
+                            className="accent-primary"
+                          />
+                          <span className="text-sm">{opt.text}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-              <Button size="sm" disabled={!allAnswered || submitting} onClick={handleSubmit}>
-                <Send size={13} className="mr-1" /> {submitting ? 'Enviando…' : 'Enviar respuestas'}
-              </Button>
+              ))}
+              {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {result && (
-          <div className="p-5 text-center space-y-4">
-            <div className={`text-5xl font-bold ${result.score !== null && result.score >= passingScore ? 'text-green-600' : 'text-red-600'}`}>
-              {result.score}/{maxScore}
-            </div>
-            <p className={`text-lg font-medium ${result.score !== null && result.score >= passingScore ? 'text-green-600' : 'text-red-600'}`}>
-              {result.score !== null && result.score >= passingScore ? '¡Aprobado!' : 'No aprobado'}
-            </p>
-            <p className="text-sm text-muted-foreground">Puntaje mínimo: {passingScore}</p>
-            <Button onClick={() => onSubmitted(result)}>Cerrar</Button>
+        {/* Sticky footer */}
+        {!loading && !result && (
+          <div className="flex shrink-0 items-center justify-between border-t px-6 py-4">
+            <span className="text-sm text-muted-foreground">
+              {answeredCount} de {totalQuestions} respondidas
+            </span>
+            <button
+              onClick={handleSubmit}
+              disabled={answeredCount < totalQuestions || submitting}
+              className="rounded-lg bg-primary px-6 py-2 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {submitting ? 'Enviando…' : 'Enviar respuestas'}
+            </button>
           </div>
         )}
       </div>
@@ -437,7 +640,7 @@ function PracticalModal({ evaluationId, onClose, onSubmitted }: {
       <div className="w-full max-w-md rounded-lg border bg-card shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h3 className="font-semibold">Entregar evaluación práctica</h3>
-          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted">✕</button>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3 px-5 py-4">
           <div className="space-y-1">
