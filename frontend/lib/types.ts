@@ -383,3 +383,41 @@ export interface StudentUnitContent {
   materials: MaterialRead[]
   assignments: StudentAssignment[]
 }
+
+// ── Training ────────────────────────────────────────────────────────────────
+
+export interface TrainingProgram {
+  public_id: string
+  name: string
+  description: string | null
+  objective: string | null
+  duration_hours: number | null
+  is_active: boolean
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface TeacherProgramProgress {
+  program_id: string
+  program_name: string
+  total_lessons: number
+  completed_lessons: number
+  total_evaluations: number
+  passed_evaluations: number
+  overall_score: number | null
+  is_certified: boolean
+  certificate_code: string | null
+}
+
+export interface TrainingEnrollmentProgress {
+  user: { public_id: string; first_name: string; last_name: string; email: string }
+  enrollment_public_id: string
+  status: string
+  lessons_completed: number
+  lessons_total: number
+  evaluations_passed: number
+  evaluations_total: number
+  average_score: number
+  is_eligible: boolean
+}

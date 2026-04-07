@@ -22,6 +22,13 @@ from app.domains.academic.routes.assignments import router as assignments_router
 from app.domains.academic.routes.submissions import router as submissions_router
 from app.domains.academic.routes.students import router as academic_students_router
 from app.domains.rbac.routes import permissions_router, roles_router, user_roles_router
+from app.domains.training.routes.programs import router as training_programs_router
+from app.domains.training.routes.modules import router as training_modules_router
+from app.domains.training.routes.lessons import router as training_lessons_router
+from app.domains.training.routes.evaluations import router as training_evaluations_router
+from app.domains.training.routes.submissions import router as training_submissions_router
+from app.domains.training.routes.enrollments import router as training_enrollments_router
+from app.domains.training.routes.certificates import router as training_certificates_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -47,3 +54,10 @@ api_router.include_router(materials_router)
 api_router.include_router(assignments_router)
 api_router.include_router(submissions_router)
 api_router.include_router(academic_students_router)
+api_router.include_router(training_programs_router)
+api_router.include_router(training_modules_router)
+api_router.include_router(training_lessons_router)
+api_router.include_router(training_evaluations_router)
+api_router.include_router(training_submissions_router)
+api_router.include_router(training_enrollments_router)
+api_router.include_router(training_certificates_router)

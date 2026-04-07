@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/login']
+const PUBLIC_PATHS = ['/login', '/training/verify']
 
 /** Routes that require specific roles. ADMIN always passes. */
 const ROUTE_ROLES: [string, string[]][] = [
@@ -15,6 +15,9 @@ const ROUTE_ROLES: [string, string[]][] = [
   ['/production', ['ADMIN', 'OPERATIVO']],
   ['/fulfillment', ['ADMIN', 'OPERATIVO']],
   ['/reports', ['ADMIN']],
+  ['/training/programs', ['ADMIN', 'TRAINER']],
+  ['/training/my-programs', ['ADMIN', 'TEACHER']],
+  ['/training/certificates', ['ADMIN', 'TEACHER']],
 ]
 
 function parseRoles(cookie: string | undefined): string[] {

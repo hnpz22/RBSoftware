@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  Award,
   BookOpen,
+  BookOpenCheck,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -65,6 +67,14 @@ export function Nav() {
         { href: '/academic/schools', label: 'Colegios',   icon: Building2, visible: () => isAdmin() },
         { href: '/academic/grades',  label: 'Mis Grados', icon: Layers,    visible: () => isAdmin() || hasRole('DIRECTOR') },
         { href: '/academic/courses', label: 'Mis Cursos', icon: BookOpen,  visible: () => isAdmin() || hasRole('DIRECTOR') || hasRole('TEACHER') || hasRole('STUDENT') },
+      ],
+    },
+    {
+      title: 'Capacitación',
+      items: [
+        { href: '/training/programs',     label: 'Programas',        icon: GraduationCap, visible: () => isAdmin() || hasRole('TRAINER') },
+        { href: '/training/my-programs',  label: 'Mis Programas',    icon: BookOpenCheck, visible: () => hasRole('TEACHER') },
+        { href: '/training/certificates', label: 'Mis Certificados', icon: Award,         visible: () => hasRole('TEACHER') },
       ],
     },
     {

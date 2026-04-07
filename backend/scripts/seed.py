@@ -85,6 +85,7 @@ ROLES = [
     RoleCreate(name="STUDENT", description="Estudiante matriculado"),
     RoleCreate(name="OPERATIVO", description="Personal de producción y bodega"),
     RoleCreate(name="COMERCIAL", description="Personal de ventas y órdenes"),
+    RoleCreate(name="TRAINER", description="Instructor de capacitación docente de RobotSchool"),
 ]
 
 
@@ -107,6 +108,7 @@ USER_ROLE_ASSIGNMENTS = [
     ("docente1@sanpedro.edu.co", "TEACHER"),
     ("estudiante1@sanpedro.edu.co", "STUDENT"),
     ("estudiante2@sanpedro.edu.co", "STUDENT"),
+    ("trainer@robotschool.com", "TRAINER"),
 ]
 
 
@@ -287,6 +289,189 @@ def seed_academic(session: Session) -> None:
         print("  [ok]   assignment 'Dibuja tu robot ideal' creado")
 
 
+# ── Capacitación ─────────────────────────────────────────────────────────────
+
+
+def seed_training(session: Session) -> None:
+    from app.domains.training.models.training_program import TrainingProgram
+    from app.domains.training.models.training_module import TrainingModule
+    from app.domains.training.models.training_lesson import TrainingLesson
+    from app.domains.training.models.training_evaluation import TrainingEvaluation
+    from app.domains.training.models.training_quiz_question import TrainingQuizQuestion
+    from app.domains.training.models.training_enrollment import TrainingEnrollment
+
+    svc = UserService()
+
+    # — Usuario TRAINER —
+    trainer_data = dict(
+        email="trainer@robotschool.com",
+        password="Trainer1234!",
+        first_name="Carlos",
+        last_name="Instructor",
+        position="Instructor de Robótica",
+    )
+    trainer = session.exec(
+        select(User).where(User.email == trainer_data["email"])
+    ).first()
+    if trainer:
+        print(f"  [skip] usuario '{trainer_data['email']}' ya existe")
+    else:
+        trainer = svc.register(session, **trainer_data)
+        print(f"  [ok]   usuario '{trainer_data['email']}' creado")
+
+    # — Programa —
+    admin = session.exec(select(User).where(User.email == "admin@robotschool.com")).first()
+    program = session.exec(
+        select(TrainingProgram).where(
+            TrainingProgram.name == "Capacitación en Robótica Educativa"
+        )
+    ).first()
+    if program:
+        print("  [skip] programa 'Capacitación en Robótica Educativa' ya existe")
+    else:
+        program = TrainingProgram(
+            name="Capacitación en Robótica Educativa",
+            description="Programa oficial de RobotSchool para docentes",
+            objective="Capacitar docentes en el uso de herramientas de robótica en el aula",
+            duration_hours=20,
+            is_active=True,
+            is_published=True,
+            created_by=admin.id if admin else None,
+        )
+        session.add(program)
+        session.commit()
+        session.refresh(program)
+        print("  [ok]   programa 'Capacitación en Robótica Educativa' creado")
+
+    # — Módulo 1 —
+    module = session.exec(
+        select(TrainingModule).where(
+            TrainingModule.title == "Introducción a la Robótica",
+            TrainingModule.program_id == program.id,
+        )
+    ).first()
+    if module:
+        print("  [skip] módulo 'Introducción a la Robótica' ya existe")
+    else:
+        module = TrainingModule(
+            program_id=program.id,
+            title="Introducción a la Robótica",
+            order_index=0,
+            is_published=True,
+        )
+        session.add(module)
+        session.commit()
+        session.refresh(module)
+        print("  [ok]   módulo 'Introducción a la Robótica' creado")
+
+    # — Lección 1 —
+    lesson = session.exec(
+        select(TrainingLesson).where(
+            TrainingLesson.title == "¿Qué es la robótica educativa?",
+            TrainingLesson.module_id == module.id,
+        )
+    ).first()
+    if lesson:
+        print("  [skip] lección '¿Qué es la robótica educativa?' ya existe")
+    else:
+        lesson = TrainingLesson(
+            module_id=module.id,
+            title="¿Qué es la robótica educativa?",
+            type="TEXT",
+            content=(
+                "La robótica educativa es una herramienta pedagógica que permite "
+                "a los estudiantes aprender conceptos de ciencia, tecnología, "
+                "ingeniería y matemáticas (STEM) a través de la construcción y "
+                "programación de robots."
+            ),
+            order_index=0,
+            is_published=True,
+        )
+        session.add(lesson)
+        session.commit()
+        session.refresh(lesson)
+        print("  [ok]   lección '¿Qué es la robótica educativa?' creada")
+
+    # — Evaluación 1 (Quiz) —
+    evaluation = session.exec(
+        select(TrainingEvaluation).where(
+            TrainingEvaluation.title == "Quiz de Introducción",
+            TrainingEvaluation.module_id == module.id,
+        )
+    ).first()
+    if evaluation:
+        print("  [skip] evaluación 'Quiz de Introducción' ya existe")
+    else:
+        evaluation = TrainingEvaluation(
+            module_id=module.id,
+            title="Quiz de Introducción",
+            type="QUIZ",
+            passing_score=60,
+            is_published=True,
+        )
+        session.add(evaluation)
+        session.commit()
+        session.refresh(evaluation)
+        print("  [ok]   evaluación 'Quiz de Introducción' creada")
+
+    # — Pregunta 1 —
+    question = session.exec(
+        select(TrainingQuizQuestion).where(
+            TrainingQuizQuestion.evaluation_id == evaluation.id,
+        )
+    ).first()
+    if question:
+        print("  [skip] pregunta del quiz ya existe")
+    else:
+        question = TrainingQuizQuestion(
+            evaluation_id=evaluation.id,
+            question="¿Cuál es el objetivo principal de la robótica educativa?",
+            options=[
+                {"id": 0, "text": "Entretenimiento"},
+                {"id": 1, "text": "Desarrollo del pensamiento computacional"},
+                {"id": 2, "text": "Competencia deportiva"},
+                {"id": 3, "text": "Ninguna de las anteriores"},
+            ],
+            correct_option=1,
+            points=10,
+            order_index=0,
+        )
+        session.add(question)
+        session.commit()
+        session.refresh(question)
+        print("  [ok]   pregunta del quiz creada")
+
+    # — Inscripción docente —
+    docente = session.exec(
+        select(User).where(User.email == "docente1@sanpedro.edu.co")
+    ).first()
+    if docente is None:
+        print("  [warn] usuario 'docente1@sanpedro.edu.co' no existe, saltando inscripción")
+        return
+
+    enrollment = session.exec(
+        select(TrainingEnrollment).where(
+            TrainingEnrollment.program_id == program.id,
+            TrainingEnrollment.user_id == docente.id,
+        )
+    ).first()
+    if enrollment:
+        print("  [skip] inscripción de 'docente1@sanpedro.edu.co' ya existe")
+    else:
+        from datetime import datetime, timezone
+
+        enrollment = TrainingEnrollment(
+            program_id=program.id,
+            user_id=docente.id,
+            enrolled_by=admin.id if admin else None,
+            enrolled_at=datetime.now(timezone.utc),
+        )
+        session.add(enrollment)
+        session.commit()
+        session.refresh(enrollment)
+        print("  [ok]   'docente1@sanpedro.edu.co' inscrito en programa de capacitación")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -303,6 +488,9 @@ def main() -> None:
 
         print("\n→ Académico (datos + usuarios):")
         seed_academic(session)
+
+        print("\n→ Capacitación (datos + usuarios):")
+        seed_training(session)
 
         print("\n→ Asignación de roles a usuarios:")
         seed_user_roles(session)
