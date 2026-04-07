@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from app.core.database import get_session
 from app.core.permissions import require_roles
+from app.core.storage import storage_service
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.training.repositories.evaluation_repository import EvaluationRepository
@@ -125,6 +126,26 @@ def get_my_submission(
     if submission is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay entrega registrada")
     return SubmissionRead.model_validate(submission)
+
+
+@router.get("/submissions/{submission_id}/view")
+def view_submission(
+    submission_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+):
+    submission = SubmissionRepository(session).get_by_public_id(submission_id)
+    if submission is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entrega no encontrada")
+    if not submission.file_key:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta entrega no tiene archivo")
+    url = storage_service.generate_presigned_url(
+        submission.file_key, expires_seconds=3600, inline=True
+    )
+    return {
+        "url": url,
+        "file_name": submission.file_name,
+    }
 
 
 @router.post(

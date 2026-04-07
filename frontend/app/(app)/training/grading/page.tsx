@@ -11,6 +11,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FileViewerModal } from '@/components/file-viewer-modal'
+import { api } from '@/lib/api'
 import type { TrainingProgram } from '@/lib/types'
 import type {
   TrainingModule,
@@ -27,6 +29,7 @@ export default function GradingPage() {
   const [selectedEvalId, setSelectedEvalId] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<TrainingSubmission[]>([])
   const [gradingSubmission, setGradingSubmission] = useState<TrainingSubmission | null>(null)
+  const [viewingFile, setViewingFile] = useState<{ url: string; fileName: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingSubs, setLoadingSubs] = useState(false)
 
@@ -257,19 +260,36 @@ export default function GradingPage() {
             setGradingSubmission(null)
             reloadSubmissions()
           }}
+          onViewFile={async (sub) => {
+            try {
+              const data = await api.get<{ url: string; file_name: string }>(
+                `/training/submissions/${sub.public_id}/view`
+              )
+              setViewingFile({ url: data.url, fileName: data.file_name ?? sub.file_name ?? '' })
+            } catch {}
+          }}
         />
       )}
+
+      {/* File viewer */}
+      <FileViewerModal
+        isOpen={viewingFile !== null}
+        onClose={() => setViewingFile(null)}
+        fileName={viewingFile?.fileName ?? ''}
+        localUrl={viewingFile?.url ?? null}
+      />
     </div>
   )
 }
 
 // ── Grade Modal ─────────────────────────────────────────────────────────────
 
-function GradeModal({ submission, evaluation, onClose, onGraded }: {
+function GradeModal({ submission, evaluation, onClose, onGraded, onViewFile }: {
   submission: TrainingSubmission
   evaluation: TrainingEvaluation
   onClose: () => void
   onGraded: () => void
+  onViewFile: (sub: TrainingSubmission) => void
 }) {
   const [score, setScore] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -317,10 +337,14 @@ function GradeModal({ submission, evaluation, onClose, onGraded }: {
 
           {/* Attached file */}
           {submission.file_name && (
-            <div className="flex items-center gap-2 rounded-md bg-muted/30 px-3 py-2">
-              <Eye size={14} className="text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">{submission.file_name}</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => onViewFile(submission)}
+              className="flex w-full items-center gap-2 rounded-md bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50"
+            >
+              <Eye size={14} className="text-primary" />
+              <span className="text-sm text-primary hover:underline">{submission.file_name}</span>
+            </button>
           )}
 
           {/* Score */}
