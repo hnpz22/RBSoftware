@@ -9,7 +9,12 @@ import {
   AreaHighlight,
 } from 'react-pdf-highlighter'
 import type { IHighlight, NewHighlight, ScaledPosition } from 'react-pdf-highlighter'
-import 'react-pdf-highlighter/dist/style.css'
+import 'react-pdf-highlighter/dist/style/AreaHighlight.css'
+import 'react-pdf-highlighter/dist/style/Highlight.css'
+import 'react-pdf-highlighter/dist/style/MouseSelection.css'
+import 'react-pdf-highlighter/dist/style/pdf_viewer.css'
+import 'react-pdf-highlighter/dist/style/PdfHighlighter.css'
+import 'react-pdf-highlighter/dist/style/Tip.css'
 import { api } from '@/lib/api'
 
 const COLORS = [
@@ -41,7 +46,10 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
         `/academic/materials/${materialId}/annotations`,
       )
       .then((data) => {
-        setHighlights(data.highlights ?? [])
+        const valid = (data.highlights ?? []).filter(
+          (h: IHighlight) => h.position?.pageNumber != null,
+        )
+        setHighlights(valid)
       })
       .catch(() => setHighlights([]))
       .finally(() => setLoading(false))
@@ -127,7 +135,8 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
       </div>
 
       {/* Visor PDF */}
-      <div className="flex-1 overflow-auto relative">
+      <div className="flex-1 relative">
+        <div className="absolute inset-0 overflow-auto">
         <PdfLoader
           url={url}
           beforeLoad={
@@ -218,6 +227,7 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
             />
           )}
         </PdfLoader>
+        </div>
       </div>
     </div>
   )

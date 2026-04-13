@@ -5,8 +5,13 @@ import { RefreshCw, Plus, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ErrorBanner } from '@/components/error-banner'
+import { Pagination } from '@/components/pagination'
+import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import type { LocationRead, Product, StockAlert } from '@/lib/types'
+
+const ITEMS_PER_PAGE = 20
 
 // ── Semaphore dot ─────────────────────────────────────────────────────────────
 
@@ -43,21 +48,24 @@ type Section = 'balances' | 'locations'
 
 export default function InventoryPage() {
   const [section, setSection] = useState<Section>('balances')
+  const { toast } = useToast()
 
   // Alerts state
   const [alerts, setAlerts] = useState<StockAlert[]>([])
   const [colorFilter, setColorFilter] = useState<ColorFilter>('ALL')
   const [loadingAlerts, setLoadingAlerts] = useState(true)
+  const [alertsError, setAlertsError] = useState<string | null>(null)
+  const [alertsPage, setAlertsPage] = useState(1)
 
   // Locations state
   const [locations, setLocations] = useState<LocationRead[]>([])
   const [loadingLocations, setLoadingLocations] = useState(false)
+  const [locationsError, setLocationsError] = useState<string | null>(null)
 
   // New location form
   const [showLocationForm, setShowLocationForm] = useState(false)
   const [locForm, setLocForm] = useState({ name: '', type: 'WAREHOUSE', address: '' })
   const [locSaving, setLocSaving] = useState(false)
-  const [locError, setLocError] = useState<string | null>(null)
 
   // Stock adjustment form
   const [showAdjustForm, setShowAdjustForm] = useState(false)
@@ -69,8 +77,6 @@ export default function InventoryPage() {
     notes: '',
   })
   const [adjSaving, setAdjSaving] = useState(false)
-  const [adjError, setAdjError] = useState<string | null>(null)
-  const [adjSuccess, setAdjSuccess] = useState<string | null>(null)
 
   // Read ?color= param on mount to pre-filter (e.g. from dashboard link)
   useEffect(() => {
@@ -83,9 +89,13 @@ export default function InventoryPage() {
 
   async function loadAlerts() {
     setLoadingAlerts(true)
+    setAlertsError(null)
     try {
       const data = await api.get<StockAlert[]>('/inventory/alerts')
       setAlerts(data)
+      setAlertsPage(1)
+    } catch (err: any) {
+      setAlertsError(err?.detail ?? 'Error al cargar el inventario. Verifica tu conexión.')
     } finally {
       setLoadingAlerts(false)
     }
@@ -93,9 +103,12 @@ export default function InventoryPage() {
 
   async function loadLocations() {
     setLoadingLocations(true)
+    setLocationsError(null)
     try {
       const data = await api.get<LocationRead[]>('/inventory/locations')
       setLocations(data)
+    } catch (err: any) {
+      setLocationsError(err?.detail ?? 'Error al cargar ubicaciones.')
     } finally {
       setLoadingLocations(false)
     }
@@ -125,7 +138,6 @@ export default function InventoryPage() {
 
   async function handleCreateLocation(e: React.FormEvent) {
     e.preventDefault()
-    setLocError(null)
     setLocSaving(true)
     try {
       await api.post('/inventory/locations', {
@@ -135,9 +147,14 @@ export default function InventoryPage() {
       })
       setLocForm({ name: '', type: 'WAREHOUSE', address: '' })
       setShowLocationForm(false)
+      toast({ title: 'Ubicación creada', variant: 'success' })
       await loadLocations()
     } catch (err: any) {
-      setLocError(err.detail ?? 'Error al crear la ubicación')
+      toast({
+        title: 'Error al crear la ubicación',
+        description: err?.detail ?? 'Intenta de nuevo',
+        variant: 'destructive',
+      })
     } finally {
       setLocSaving(false)
     }
@@ -147,8 +164,6 @@ export default function InventoryPage() {
 
   async function handleAdjust(e: React.FormEvent) {
     e.preventDefault()
-    setAdjError(null)
-    setAdjSuccess(null)
     setAdjSaving(true)
     try {
       await api.post('/inventory/movements', {
@@ -158,11 +173,19 @@ export default function InventoryPage() {
         delta: parseInt(adjForm.delta, 10),
         notes: adjForm.notes.trim() || null,
       })
-      setAdjSuccess(`Stock ajustado: +${adjForm.delta} unidades FREE`)
+      toast({
+        title: 'Stock ajustado',
+        description: `+${adjForm.delta} unidades FREE registradas`,
+        variant: 'success',
+      })
       setAdjForm({ product_public_id: '', location_public_id: '', delta: '1', notes: '' })
       await loadAlerts()
     } catch (err: any) {
-      setAdjError(err.detail ?? 'Error al ajustar stock')
+      toast({
+        title: 'Error al ajustar stock',
+        description: err?.detail ?? 'Intenta de nuevo',
+        variant: 'destructive',
+      })
     } finally {
       setAdjSaving(false)
     }
@@ -178,6 +201,17 @@ export default function InventoryPage() {
   const yellowCount = alerts.filter((a) => a.status_color === 'YELLOW').length
   const greenCount  = alerts.filter((a) => a.status_color === 'GREEN').length
 
+  const alertsTotalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginatedAlerts = filtered.slice(
+    (alertsPage - 1) * ITEMS_PER_PAGE,
+    alertsPage * ITEMS_PER_PAGE,
+  )
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setAlertsPage(1)
+  }, [colorFilter])
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -192,7 +226,7 @@ export default function InventoryPage() {
           disabled={loadingAlerts || loadingLocations}
         >
           <RefreshCw size={14} className={(loadingAlerts || loadingLocations) ? 'animate-spin' : ''} />
-          <span className="ml-2">Actualizar</span>
+          <span className="ml-2 hidden sm:inline">Actualizar</span>
         </Button>
       </div>
 
@@ -216,7 +250,9 @@ export default function InventoryPage() {
       {/* ── BALANCES ── */}
       {section === 'balances' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          {alertsError && <ErrorBanner message={alertsError} onRetry={loadAlerts} />}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               {alerts.length} productos ·{' '}
               <span className="text-red-500 font-medium">{redCount} sin stock</span>
@@ -231,12 +267,11 @@ export default function InventoryPage() {
                 setShowAdjustForm(true)
                 loadLocations()
                 loadProducts()
-                setAdjError(null)
-                setAdjSuccess(null)
               }}
             >
               <Plus size={14} className="mr-1" />
-              Ajuste de inventario
+              <span className="hidden sm:inline">Ajuste de inventario</span>
+              <span className="sm:hidden">Ajustar</span>
             </Button>
           </div>
 
@@ -245,7 +280,7 @@ export default function InventoryPage() {
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Registrar stock inicial / ajuste</p>
-                <button onClick={() => { setShowAdjustForm(false); setAdjError(null); setAdjSuccess(null) }}>
+                <button onClick={() => setShowAdjustForm(false)}>
                   <X size={16} className="text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
@@ -266,7 +301,7 @@ export default function InventoryPage() {
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <label className="text-xs font-medium">Ubicación</label>
                     <select
@@ -302,8 +337,6 @@ export default function InventoryPage() {
                     onChange={(e) => setAdjForm({ ...adjForm, notes: e.target.value })}
                   />
                 </div>
-                {adjError && <p className="text-sm text-destructive">{adjError}</p>}
-                {adjSuccess && <p className="text-sm text-green-600">{adjSuccess}</p>}
                 <div className="flex gap-2">
                   <Button
                     type="submit"
@@ -316,7 +349,7 @@ export default function InventoryPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => { setShowAdjustForm(false); setAdjError(null); setAdjSuccess(null) }}
+                    onClick={() => setShowAdjustForm(false)}
                   >
                     Cancelar
                   </Button>
@@ -343,60 +376,73 @@ export default function InventoryPage() {
           </div>
 
           {/* Alerts table */}
-          <div className="rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium w-8">Estado</th>
-                  <th className="px-4 py-3 text-left font-medium">Producto</th>
-                  <th className="px-4 py-3 text-right font-medium w-28">Unidades FREE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingAlerts && (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
-                      Cargando…
-                    </td>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg border">
+            <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium w-8">Estado</th>
+                    <th className="px-4 py-3 text-left font-medium">Producto</th>
+                    <th className="px-4 py-3 text-right font-medium w-28">Unidades FREE</th>
                   </tr>
-                )}
-                {!loadingAlerts && filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
-                      {alerts.length === 0
-                        ? 'Sin productos activos en catálogo.'
-                        : 'No hay productos con ese estado.'}
-                    </td>
-                  </tr>
-                )}
-                {filtered.map((alert) => (
-                  <tr key={alert.product_id} className="border-b last:border-0">
-                    <td className="px-4 py-3">
-                      <Dot color={alert.status_color} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium leading-tight">{alert.product_name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{alert.sku}</p>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium">
-                      {alert.total_free}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {loadingAlerts && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                        Cargando…
+                      </td>
+                    </tr>
+                  )}
+                  {!loadingAlerts && !alertsError && filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                        {alerts.length === 0
+                          ? 'Sin productos activos en catálogo.'
+                          : 'No hay productos con ese estado.'}
+                      </td>
+                    </tr>
+                  )}
+                  {paginatedAlerts.map((alert) => (
+                    <tr key={alert.product_id} className="border-b last:border-0">
+                      <td className="px-4 py-3">
+                        <Dot color={alert.status_color} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium leading-tight">{alert.product_name}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{alert.sku}</p>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                        {alert.total_free}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          <Pagination
+            currentPage={alertsPage}
+            totalPages={alertsTotalPages}
+            onPageChange={setAlertsPage}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+          />
         </div>
       )}
 
       {/* ── LOCATIONS ── */}
       {section === 'locations' && (
         <div className="space-y-4">
+          {locationsError && <ErrorBanner message={locationsError} onRetry={loadLocations} />}
+
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">{locations.length} ubicaciones</p>
-            <Button size="sm" onClick={() => { setShowLocationForm(true); setLocError(null) }}>
+            <Button size="sm" onClick={() => setShowLocationForm(true)}>
               <Plus size={14} className="mr-1" />
-              Nueva ubicación
+              <span className="hidden sm:inline">Nueva ubicación</span>
+              <span className="sm:hidden">Nueva</span>
             </Button>
           </div>
 
@@ -405,12 +451,12 @@ export default function InventoryPage() {
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Nueva ubicación</p>
-                <button onClick={() => { setShowLocationForm(false); setLocError(null) }}>
+                <button onClick={() => setShowLocationForm(false)}>
                   <X size={16} className="text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
               <form onSubmit={handleCreateLocation} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <label className="text-xs font-medium">Nombre</label>
                     <Input
@@ -442,7 +488,6 @@ export default function InventoryPage() {
                     onChange={(e) => setLocForm({ ...locForm, address: e.target.value })}
                   />
                 </div>
-                {locError && <p className="text-sm text-destructive">{locError}</p>}
                 <div className="flex gap-2">
                   <Button type="submit" size="sm" disabled={locSaving}>
                     {locSaving ? 'Guardando…' : 'Crear ubicación'}
@@ -451,7 +496,7 @@ export default function InventoryPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => { setShowLocationForm(false); setLocError(null) }}
+                    onClick={() => setShowLocationForm(false)}
                   >
                     Cancelar
                   </Button>
@@ -461,49 +506,51 @@ export default function InventoryPage() {
           )}
 
           {/* Locations table */}
-          <div className="rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Nombre</th>
-                  <th className="px-4 py-3 text-left font-medium">Tipo</th>
-                  <th className="px-4 py-3 text-left font-medium">Dirección</th>
-                  <th className="px-4 py-3 text-left font-medium">Activa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingLocations && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                      Cargando…
-                    </td>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg border">
+            <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium">Nombre</th>
+                    <th className="px-4 py-3 text-left font-medium">Tipo</th>
+                    <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Dirección</th>
+                    <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Activa</th>
                   </tr>
-                )}
-                {!loadingLocations && locations.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                      Sin ubicaciones. Ejecuta el seed o crea una manualmente.
-                    </td>
-                  </tr>
-                )}
-                {locations.map((loc) => (
-                  <tr key={loc.public_id} className="border-b last:border-0">
-                    <td className="px-4 py-3 font-medium">{loc.name}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline">{loc.type}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {loc.address ?? '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={loc.is_active ? 'text-green-600' : 'text-muted-foreground'}>
-                        {loc.is_active ? 'Sí' : 'No'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {loadingLocations && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                        Cargando…
+                      </td>
+                    </tr>
+                  )}
+                  {!loadingLocations && !locationsError && locations.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                        Sin ubicaciones. Ejecuta el seed o crea una manualmente.
+                      </td>
+                    </tr>
+                  )}
+                  {locations.map((loc) => (
+                    <tr key={loc.public_id} className="border-b last:border-0">
+                      <td className="px-4 py-3 font-medium">{loc.name}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline">{loc.type}</Badge>
+                      </td>
+                      <td className="hidden px-4 py-3 text-muted-foreground text-xs sm:table-cell">
+                        {loc.address ?? '—'}
+                      </td>
+                      <td className="hidden px-4 py-3 sm:table-cell">
+                        <span className={loc.is_active ? 'text-green-600' : 'text-muted-foreground'}>
+                          {loc.is_active ? 'Sí' : 'No'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

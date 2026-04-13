@@ -5,7 +5,12 @@ import { AlertCircle, Download, FileText, Image as ImageIcon, Loader2, X } from 
 import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import { useAuthStore } from '@/lib/store'
-import { PDFHighlighterViewer } from './pdf-highlighter'
+import dynamic from 'next/dynamic'
+
+const PDFHighlighterViewer = dynamic(
+  () => import('./pdf-highlighter').then((mod) => mod.PDFHighlighterViewer),
+  { ssr: false },
+)
 
 interface Props {
   isOpen: boolean

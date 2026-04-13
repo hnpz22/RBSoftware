@@ -15,8 +15,13 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ErrorBanner } from '@/components/error-banner'
+import { Pagination } from '@/components/pagination'
+import { useToast } from '@/components/ui/use-toast'
 import { api } from '@/lib/api'
 import type { ProductionBatch, SalesOrder } from '@/lib/types'
+
+const ITEMS_PER_PAGE = 20
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +46,6 @@ const TRANSITION_LABEL: Record<string, string> = {
 const BATCH_KINDS = ['SALES', 'STOCK', 'FAIR', 'MANUAL'] as const
 type BatchKind = (typeof BATCH_KINDS)[number]
 
-// Kind badge colors (inline — avoids extending Badge variants)
 const KIND_CLASS: Record<string, string> = {
   SALES:  'bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-300',
   STOCK:  'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
@@ -49,7 +53,6 @@ const KIND_CLASS: Record<string, string> = {
   MANUAL: 'bg-slate-100  text-slate-600  dark:bg-slate-800  dark:text-slate-300',
 }
 
-// Kanban column definitions
 const KANBAN_COLUMNS = [
   {
     status:    'PENDING',
@@ -84,7 +87,7 @@ function CutoffConfirmDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-xl">
+      <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-xl mx-4">
         <div className="mb-4 flex items-start gap-3">
           <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-500" />
           <div>
@@ -125,6 +128,7 @@ function NewBatchModal({
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (kind !== 'SALES') {
@@ -164,6 +168,7 @@ function NewBatchModal({
         items: [],
         sales_order_public_ids: Array.from(selectedOrderIds),
       })
+      toast({ title: 'Batch creado', variant: 'success' })
       onCreated()
     } catch (err: any) {
       setError(err?.detail ?? 'Error al crear el batch')
@@ -174,7 +179,7 @@ function NewBatchModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border bg-card shadow-xl">
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border bg-card shadow-xl mx-4">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-lg font-semibold">Nuevo batch de producción</h2>
           <button onClick={onClose} className="rounded-md p-1 hover:bg-muted">
@@ -314,7 +319,6 @@ function BatchCard({
 
   return (
     <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-3">
-      {/* Name + ID */}
       <div>
         <p className="font-medium leading-tight text-sm">
           {batch.name ?? (
@@ -326,7 +330,6 @@ function BatchCard({
         </p>
       </div>
 
-      {/* Kind + item count */}
       <div className="flex items-center justify-between gap-2">
         <span
           className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
@@ -340,12 +343,10 @@ function BatchCard({
         </span>
       </div>
 
-      {/* Date */}
       <p className="text-xs text-muted-foreground">
         {new Date(batch.created_at).toLocaleDateString('es-ES')}
       </p>
 
-      {/* Actions */}
       <div className="flex flex-wrap gap-1.5 border-t pt-2.5">
         <Link href={`/production/${batch.public_id}`}>
           <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs">
@@ -387,7 +388,6 @@ function KanbanColumn({
 
   return (
     <div className={`flex flex-col rounded-xl p-3 ${column.colClass}`}>
-      {/* Column header */}
       <div className="mb-3 flex items-center gap-2 px-1">
         <span className={`h-2 w-2 shrink-0 rounded-full ${column.dotClass}`} />
         <span className="text-sm font-semibold">{column.label}</span>
@@ -396,7 +396,6 @@ function KanbanColumn({
         </span>
       </div>
 
-      {/* Cards */}
       <div className="flex flex-col gap-3">
         {colBatches.length === 0 ? (
           <p className="rounded-lg border border-dashed border-muted-foreground/30 py-10 text-center text-xs text-muted-foreground">
@@ -424,18 +423,25 @@ type View = 'list' | 'kanban'
 export default function ProductionPage() {
   const [batches, setBatches] = useState<ProductionBatch[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState<string | null>(null)
   const [printingId, setPrintingId] = useState<string | null>(null)
   const [showNewBatch, setShowNewBatch] = useState(false)
   const [showCutoffConfirm, setShowCutoffConfirm] = useState(false)
   const [cutoffLoading, setCutoffLoading] = useState(false)
   const [view, setView] = useState<View>('list')
+  const [currentPage, setCurrentPage] = useState(1)
+  const { toast } = useToast()
 
   async function load() {
     setLoading(true)
+    setError(null)
     try {
       const data = await api.get<ProductionBatch[]>('/production/batches')
       setBatches(data)
+      setCurrentPage(1)
+    } catch (err: any) {
+      setError(err?.detail ?? 'Error al cargar producción. Verifica tu conexión.')
     } finally {
       setLoading(false)
     }
@@ -447,9 +453,14 @@ export default function ProductionPage() {
     setUpdating(publicId + newStatus)
     try {
       await api.patch(`/production/batches/${publicId}/status`, { status: newStatus })
+      toast({ title: `Estado actualizado a ${newStatus}`, variant: 'success' })
       await load()
-    } catch {
-      await load()
+    } catch (err: any) {
+      toast({
+        title: 'Error al actualizar estado',
+        description: err?.detail ?? 'Intenta de nuevo',
+        variant: 'destructive',
+      })
     } finally {
       setUpdating(null)
     }
@@ -458,11 +469,20 @@ export default function ProductionPage() {
   async function handleCutoff() {
     setCutoffLoading(true)
     try {
-      await api.post('/production/batches/cutoff')
+      const result = await api.post<ProductionBatch>('/production/batches/cutoff')
       setShowCutoffConfirm(false)
+      toast({
+        title: 'Corte ejecutado',
+        description: `Batch generado con ${result?.items?.length ?? 0} productos`,
+        variant: 'success',
+      })
       await load()
-    } catch {
-      await load()
+    } catch (err: any) {
+      toast({
+        title: 'Error en corte automático',
+        description: err?.detail ?? 'Intenta de nuevo',
+        variant: 'destructive',
+      })
     } finally {
       setCutoffLoading(false)
     }
@@ -476,7 +496,7 @@ export default function ProductionPage() {
       const blob = await res.blob()
       window.open(URL.createObjectURL(blob), '_blank')
     } catch {
-      // silently fail
+      toast({ title: 'Error al generar PDF', variant: 'destructive' })
     } finally {
       setPrintingId(null)
     }
@@ -486,6 +506,12 @@ export default function ProductionPage() {
     setShowNewBatch(false)
     load()
   }
+
+  const totalPages = Math.ceil(batches.length / ITEMS_PER_PAGE)
+  const paginatedBatches = batches.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  )
 
   return (
     <>
@@ -502,12 +528,12 @@ export default function ProductionPage() {
 
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Producción</h1>
             <p className="text-sm text-muted-foreground">{batches.length} batches</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* View toggle */}
             <div className="flex overflow-hidden rounded-md border">
               <button
@@ -536,123 +562,138 @@ export default function ProductionPage() {
 
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span className="ml-2">Actualizar</span>
+              <span className="ml-2 hidden sm:inline">Actualizar</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowCutoffConfirm(true)}>
-              Corte automático
+              <span className="hidden sm:inline">Corte automático</span>
+              <span className="sm:hidden">Corte</span>
             </Button>
             <Button size="sm" onClick={() => setShowNewBatch(true)}>
               <Plus size={14} />
-              <span className="ml-2">Nuevo batch</span>
+              <span className="ml-2 hidden sm:inline">Nuevo batch</span>
             </Button>
           </div>
         </div>
 
+        {error && <ErrorBanner message={error} onRetry={load} />}
+
         {/* ── LIST VIEW ── */}
         {view === 'list' && (
-          <div className="rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Nombre</th>
-                  <th className="px-4 py-3 text-left font-medium">Tipo</th>
-                  <th className="px-4 py-3 text-left font-medium">Estado</th>
-                  <th className="px-4 py-3 text-left font-medium">Items</th>
-                  <th className="px-4 py-3 text-left font-medium">Acciones</th>
-                  <th className="px-4 py-3 text-left font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                      Cargando…
-                    </td>
-                  </tr>
-                )}
-                {!loading && batches.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                      No hay batches de producción
-                    </td>
-                  </tr>
-                )}
-                {batches.map((batch) => {
-                  const nextSteps = TRANSITIONS[batch.status] ?? []
-                  return (
-                    <tr key={batch.public_id} className="border-b last:border-0">
-                      <td className="px-4 py-3">
-                        <p className="font-medium">
-                          {batch.name ?? (
-                            <span className="italic text-muted-foreground">Sin nombre</span>
-                          )}
-                        </p>
-                        <p className="font-mono text-xs text-muted-foreground">
-                          {batch.public_id.slice(0, 8)}…
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-semibold ${
-                            KIND_CLASS[batch.kind] ?? 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          {batch.kind}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={(STATUS_VARIANT[batch.status] ?? 'outline') as any}>
-                          {batch.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {batch.items.length} producto{batch.items.length !== 1 ? 's' : ''}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          {nextSteps.map((s) => (
-                            <Button
-                              key={s}
-                              size="sm"
-                              variant={s === 'CANCELLED' ? 'outline' : 'default'}
-                              disabled={!!updating}
-                              onClick={() => updateStatus(batch.public_id, s)}
-                            >
-                              {updating === batch.public_id + s ? '…' : TRANSITION_LABEL[s]}
-                            </Button>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {batch.status === 'IN_PROGRESS' && (
-                            <button
-                              onClick={() => openPdf(batch.public_id)}
-                              disabled={printingId === batch.public_id}
-                              title="Imprimir hoja maestra"
-                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                            >
-                              <Printer size={15} />
-                            </button>
-                          )}
-                          <Link href={`/production/${batch.public_id}`}>
-                            <ChevronRight size={16} className="text-muted-foreground hover:text-foreground" />
-                          </Link>
-                        </div>
-                      </td>
+          <>
+            <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg border">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-3 text-left font-medium">Nombre</th>
+                      <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Tipo</th>
+                      <th className="px-4 py-3 text-left font-medium">Estado</th>
+                      <th className="hidden px-4 py-3 text-left font-medium sm:table-cell">Items</th>
+                      <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Acciones</th>
+                      <th className="px-4 py-3 text-left font-medium" />
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {loading && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                          Cargando…
+                        </td>
+                      </tr>
+                    )}
+                    {!loading && !error && batches.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                          No hay batches de producción
+                        </td>
+                      </tr>
+                    )}
+                    {paginatedBatches.map((batch) => {
+                      const nextSteps = TRANSITIONS[batch.status] ?? []
+                      return (
+                        <tr key={batch.public_id} className="border-b last:border-0">
+                          <td className="px-4 py-3">
+                            <p className="font-medium">
+                              {batch.name ?? (
+                                <span className="italic text-muted-foreground">Sin nombre</span>
+                              )}
+                            </p>
+                            <p className="font-mono text-xs text-muted-foreground">
+                              {batch.public_id.slice(0, 8)}…
+                            </p>
+                          </td>
+                          <td className="hidden px-4 py-3 sm:table-cell">
+                            <span
+                              className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                                KIND_CLASS[batch.kind] ?? 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {batch.kind}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant={(STATUS_VARIANT[batch.status] ?? 'outline') as any}>
+                              {batch.status}
+                            </Badge>
+                          </td>
+                          <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
+                            {batch.items.length} producto{batch.items.length !== 1 ? 's' : ''}
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            <div className="flex gap-2">
+                              {nextSteps.map((s) => (
+                                <Button
+                                  key={s}
+                                  size="sm"
+                                  variant={s === 'CANCELLED' ? 'outline' : 'default'}
+                                  disabled={!!updating}
+                                  onClick={() => updateStatus(batch.public_id, s)}
+                                >
+                                  {updating === batch.public_id + s ? '…' : TRANSITION_LABEL[s]}
+                                </Button>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {batch.status === 'IN_PROGRESS' && (
+                                <button
+                                  onClick={() => openPdf(batch.public_id)}
+                                  disabled={printingId === batch.public_id}
+                                  title="Imprimir hoja maestra"
+                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                  <Printer size={15} />
+                                </button>
+                              )}
+                              <Link href={`/production/${batch.public_id}`}>
+                                <ChevronRight size={16} className="text-muted-foreground hover:text-foreground" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={batches.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+            />
+          </>
         )}
 
         {/* ── KANBAN VIEW ── */}
         {view === 'kanban' && (
           <>
             {loading ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {KANBAN_COLUMNS.map((col) => (
                   <div
                     key={col.status}
@@ -661,7 +702,7 @@ export default function ProductionPage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {KANBAN_COLUMNS.map((col) => (
                   <KanbanColumn
                     key={col.status}
