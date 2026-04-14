@@ -51,7 +51,7 @@ export function Nav() {
   const router = useRouter()
   const { user, setUser, hasRole, isAdmin } = useAuthStore()
   const { open, collapsed, setOpen, toggleCollapsed } = useSidebarStore()
-  const { theme, toggleTheme } = useThemeStore()
+  const { theme, toggleTheme, syncFromSystem } = useThemeStore()
 
   const sections: NavSection[] = [
     {
@@ -265,8 +265,14 @@ export function Nav() {
           </button>
           <button
             onClick={toggleTheme}
+            onDoubleClick={(e) => {
+              e.preventDefault()
+              localStorage.removeItem('theme')
+              const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+              syncFromSystem(systemDark ? 'dark' : 'light')
+            }}
             className="rounded-md p-2 text-blue-300 transition-colors hover:bg-blue-800 hover:text-white"
-            title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            title="Clic: alternar tema · Doble clic: seguir tema del sistema"
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
