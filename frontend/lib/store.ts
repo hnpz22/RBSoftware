@@ -29,6 +29,7 @@ interface ThemeState {
   theme: Theme
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  syncFromSystem: (theme: Theme) => void
 }
 
 function getInitialTheme(): Theme {
@@ -48,6 +49,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   toggleTheme: () => {
     const next = get().theme === 'dark' ? 'light' : 'dark'
     get().setTheme(next)
+  },
+  syncFromSystem: (theme) => {
+    set({ theme })
+    document.documentElement.classList.toggle('dark', theme === 'dark')
   },
 }))
 

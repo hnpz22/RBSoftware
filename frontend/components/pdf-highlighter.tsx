@@ -9,12 +9,7 @@ import {
   AreaHighlight,
 } from 'react-pdf-highlighter'
 import type { IHighlight, NewHighlight, ScaledPosition } from 'react-pdf-highlighter'
-import 'react-pdf-highlighter/dist/style/AreaHighlight.css'
-import 'react-pdf-highlighter/dist/style/Highlight.css'
-import 'react-pdf-highlighter/dist/style/MouseSelection.css'
-import 'react-pdf-highlighter/dist/style/pdf_viewer.css'
-import 'react-pdf-highlighter/dist/style/PdfHighlighter.css'
-import 'react-pdf-highlighter/dist/style/Tip.css'
+import 'react-pdf-highlighter/dist/style.css'
 import { api } from '@/lib/api'
 
 const COLORS = [
@@ -247,15 +242,29 @@ function CommentTip({
   const [emoji, setEmoji] = useState('💡')
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border p-3 w-64 space-y-2">
-      <div className="flex gap-1">
+    <div
+      style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '8px',
+        padding: '12px',
+        width: '260px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
         {['💡', '❓', '⚠️', '✅', '📌'].map((e) => (
           <button
             key={e}
             onClick={() => setEmoji(e)}
-            className={`text-lg rounded p-0.5 ${
-              emoji === e ? 'bg-muted' : 'hover:bg-muted/50'
-            }`}
+            style={{
+              fontSize: '18px',
+              padding: '2px 4px',
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              background: emoji === e ? '#f1f5f9' : 'transparent',
+            }}
           >
             {e}
           </button>
@@ -265,19 +274,50 @@ function CommentTip({
         placeholder="Comentario (opcional)"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="w-full text-sm border rounded p-2 resize-none h-16 focus:outline-none focus:ring-1 focus:ring-primary"
+        style={{
+          width: '100%',
+          padding: '8px',
+          borderRadius: '6px',
+          border: '1px solid #cbd5e1',
+          fontSize: '13px',
+          color: '#0f172a',
+          background: '#ffffff',
+          resize: 'none',
+          height: '64px',
+          outline: 'none',
+          fontFamily: 'inherit',
+          boxSizing: 'border-box',
+        }}
       />
-      <div className="flex gap-2">
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
         <button
           onClick={() => onConfirm({ text, emoji })}
-          className="flex-1 text-xs py-1.5 rounded font-medium text-white"
-          style={{ background: color }}
+          style={{
+            flex: 1,
+            padding: '6px',
+            borderRadius: '6px',
+            border: 'none',
+            background: color,
+            color: '#ffffff',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
         >
           Guardar
         </button>
         <button
           onClick={onCancel}
-          className="flex-1 text-xs py-1.5 rounded border hover:bg-muted/50"
+          style={{
+            flex: 1,
+            padding: '6px',
+            borderRadius: '6px',
+            border: '1px solid #e2e8f0',
+            background: '#ffffff',
+            color: '#64748b',
+            fontSize: '12px',
+            cursor: 'pointer',
+          }}
         >
           Cancelar
         </button>

@@ -15,6 +15,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [theme])
 
   useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    function handleChange(e: MediaQueryListEvent) {
+      if (!localStorage.getItem('theme')) {
+        useThemeStore.getState().syncFromSystem(e.matches ? 'dark' : 'light')
+      }
+    }
+    mq.addEventListener('change', handleChange)
+    return () => mq.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
     if (window.location.pathname === '/login') {
       setHydrated()
       return
