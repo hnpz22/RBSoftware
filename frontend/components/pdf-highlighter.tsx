@@ -50,6 +50,15 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
       .finally(() => setLoading(false))
   }, [materialId])
 
+  // Forzar reflow tras cargar para que react-pdf-highlighter pinte los highlights
+  useEffect(() => {
+    if (loading) return
+    const t = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [loading])
+
   // Guardar con debounce
   const saveHighlights = useCallback(
     (newHighlights: IHighlight[]) => {
