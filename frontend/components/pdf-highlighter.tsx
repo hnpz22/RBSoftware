@@ -133,6 +133,7 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
       <div className="flex-1 relative">
         <div className="absolute inset-0 overflow-auto">
         <PdfLoader
+          key={url}
           url={url}
           beforeLoad={
             <div className="flex items-center justify-center h-full">
@@ -142,6 +143,7 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
         >
           {(pdfDocument) => (
             <PdfHighlighter
+              key={materialId}
               pdfDocument={pdfDocument}
               enableAreaSelection={(event) => event.altKey}
               onScrollChange={() => {}}
