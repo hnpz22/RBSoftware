@@ -152,6 +152,10 @@ export function completeLesson(lessonId: string) {
   return api.post<void>(`/training/lessons/${lessonId}/complete`)
 }
 
+export function getMyCompletedLessons(programId: string) {
+  return api.get<string[]>(`/training/programs/${programId}/my-completed-lessons`)
+}
+
 export function getLessonViewUrl(lessonId: string) {
   return api.get<{ url: string }>(`/training/lessons/${lessonId}/view`)
 }

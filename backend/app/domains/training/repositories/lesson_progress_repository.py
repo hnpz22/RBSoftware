@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlmodel import Session, select
 
@@ -31,6 +32,18 @@ class LessonProgressRepository:
         stmt = (
             select(TrainingLessonProgress.lesson_id)
             .join(TrainingLesson, TrainingLesson.id == TrainingLessonProgress.lesson_id)
+            .join(TrainingModule, TrainingModule.id == TrainingLesson.module_id)
+            .where(
+                TrainingLessonProgress.user_id == user_id,
+                TrainingModule.program_id == program_id,
+            )
+        )
+        return list(self.session.exec(stmt).all())
+
+    def get_completed_lesson_public_ids(self, user_id: int, program_id: int) -> list[UUID]:
+        stmt = (
+            select(TrainingLesson.public_id)
+            .join(TrainingLessonProgress, TrainingLesson.id == TrainingLessonProgress.lesson_id)
             .join(TrainingModule, TrainingModule.id == TrainingLesson.module_id)
             .where(
                 TrainingLessonProgress.user_id == user_id,

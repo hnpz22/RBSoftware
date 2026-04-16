@@ -69,6 +69,23 @@ def enroll_teacher(
 
 
 @router.get(
+    "/programs/{program_id}/my-completed-lessons",
+    response_model=list[UUID],
+)
+def get_my_completed_lessons(
+    program_id: UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("TEACHER")),
+):
+    try:
+        return _svc.get_my_completed_lessons(session, program_id, current_user.id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
+@router.get(
     "/my-programs",
     response_model=list[TeacherProgramProgress],
 )

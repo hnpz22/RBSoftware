@@ -259,6 +259,22 @@ class TrainingService:
 
     # ── Teacher progress ─────────────────────────────────────────────────────
 
+    def get_my_completed_lessons(
+        self,
+        session: Session,
+        program_id: UUID,
+        user_id: int,
+    ) -> list[UUID]:
+        program = ProgramRepository(session).get_by_public_id(program_id)
+        if program is None:
+            raise LookupError("Programa no encontrado")
+        enrollment_repo = EnrollmentRepository(session)
+        if not enrollment_repo.is_enrolled(user_id, program.id):
+            raise PermissionError("El usuario no está inscrito en este programa")
+        return LessonProgressRepository(session).get_completed_lesson_public_ids(
+            user_id, program.id
+        )
+
     def mark_lesson_completed(
         self,
         session: Session,

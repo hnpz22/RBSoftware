@@ -12,6 +12,7 @@ import {
   Circle,
   ClipboardList,
   FileText,
+  Lock,
   Menu,
   Send,
   Video,
@@ -57,6 +58,7 @@ export function TeacherProgramView({ program, modules }: Props) {
   const [moduleEvals, setModuleEvals] = useState<ModuleEvals[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [completedSet, setCompletedSet] = useState<Set<string>>(new Set())
+  const [submissionMap, setSubmissionMap] = useState<Map<string, TrainingSubmission>>(new Map())
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [loading, setLoading] = useState(true)
 
@@ -66,6 +68,7 @@ export function TeacherProgramView({ program, modules }: Props) {
       setLoading(true)
       const flat: FlatLesson[] = []
       const evals: ModuleEvals[] = []
+      const subs = new Map<string, TrainingSubmission>()
       let idx = 0
 
       for (let mi = 0; mi < publishedModules.length; mi++) {
@@ -82,11 +85,28 @@ export function TeacherProgramView({ program, modules }: Props) {
         const pubEvals = evaluations.filter((e) => e.is_published)
         if (pubEvals.length > 0) {
           evals.push({ moduleId: mod.public_id, evaluations: pubEvals })
+          // Load submissions for each evaluation
+          await Promise.all(
+            pubEvals.map(async (ev) => {
+              try {
+                const sub = await trainingService.getMySubmission(ev.public_id)
+                subs.set(ev.public_id, sub)
+              } catch {}
+            })
+          )
         }
       }
 
+      // Load completed lesson IDs from backend
+      let completedIds: string[] = []
+      try {
+        completedIds = await trainingService.getMyCompletedLessons(program.public_id)
+      } catch {}
+
       setAllLessons(flat)
       setModuleEvals(evals)
+      setSubmissionMap(subs)
+      setCompletedSet(new Set(completedIds))
       setLoading(false)
     }
     if (publishedModules.length > 0) loadAll()
@@ -107,6 +127,31 @@ export function TeacherProgramView({ program, modules }: Props) {
   const isLastLessonOfModule = currentLesson
     ? !allLessons[currentIndex + 1] || allLessons[currentIndex + 1].moduleIndex !== currentLesson.moduleIndex
     : false
+
+  function isModuleUnlocked(moduleIndex: number): boolean {
+    if (moduleIndex === 0) return true
+    const prevModuleId = publishedModules[moduleIndex - 1]?.public_id
+    if (!prevModuleId) return false
+
+    // All lessons of previous module must be completed
+    const prevLessons = allLessons.filter((l) => l.moduleIndex === moduleIndex - 1)
+    const allLessonsCompleted = prevLessons.length > 0 && prevLessons.every((l) => completedSet.has(l.public_id))
+
+    // All evaluations of previous module must be passed
+    const prevEvalData = moduleEvals.find((me) => me.moduleId === prevModuleId)
+    const allEvalsApproved = !prevEvalData || prevEvalData.evaluations.every((ev) => {
+      const sub = submissionMap.get(ev.public_id)
+      return sub?.status === 'GRADED' && (sub?.score ?? 0) >= ev.passing_score
+    })
+
+    return allLessonsCompleted && allEvalsApproved
+  }
+
+  function canGoNext(): boolean {
+    if (currentIndex >= totalLessons - 1) return false
+    const nextLesson = allLessons[currentIndex + 1]
+    return isModuleUnlocked(nextLesson.moduleIndex)
+  }
 
   function goNext() {
     if (currentIndex < totalLessons - 1) {
@@ -191,36 +236,49 @@ export function TeacherProgramView({ program, modules }: Props) {
         {/* ── Sidebar ── */}
         <div className={`${sidebarOpen ? 'block' : 'hidden'} md:block w-72 shrink-0 border-r bg-muted/20 overflow-y-auto`}>
           <div className="p-3">
-            {moduleGroups.map((group, gi) => (
-              <div key={gi} className="mb-4">
-                <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Módulo {gi + 1}
-                </p>
-                <p className="px-2 mb-2 text-xs font-medium text-muted-foreground truncate">{group.title}</p>
-                {group.lessons.map((l) => {
-                  const isActive = l.flatIndex === currentIndex
-                  const isDone = completedSet.has(l.public_id)
-                  return (
-                    <button
-                      key={l.public_id}
-                      onClick={() => { setCurrentIndex(l.flatIndex); setSidebarOpen(false) }}
-                      className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors mb-0.5 ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground font-medium'
-                          : 'hover:bg-muted'
-                      }`}
-                    >
-                      {isDone ? (
-                        <CheckCircle2 size={14} className={isActive ? 'text-primary-foreground' : 'text-green-500'} />
-                      ) : (
-                        <Circle size={14} className={isActive ? 'text-primary-foreground/60' : 'text-muted-foreground/40'} />
-                      )}
-                      <span className="truncate">{l.title}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+            {moduleGroups.map((group, gi) => {
+              const unlocked = isModuleUnlocked(gi)
+              return (
+                <div key={gi} className="mb-4">
+                  <div
+                    title={!unlocked ? 'Completa el módulo anterior para desbloquear' : undefined}
+                    className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                      unlocked ? 'text-muted-foreground' : 'text-muted-foreground/40'
+                    }`}
+                  >
+                    {!unlocked && <Lock size={10} />}
+                    <span>Módulo {gi + 1}</span>
+                  </div>
+                  <p className={`px-2 mb-2 text-xs font-medium truncate ${
+                    unlocked ? 'text-muted-foreground' : 'text-muted-foreground/40'
+                  }`}>{group.title}</p>
+                  {group.lessons.map((l) => {
+                    const isActive = l.flatIndex === currentIndex
+                    const isDone = completedSet.has(l.public_id)
+                    return (
+                      <button
+                        key={l.public_id}
+                        onClick={() => { if (!unlocked) return; setCurrentIndex(l.flatIndex); setSidebarOpen(false) }}
+                        className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors mb-0.5 ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground font-medium'
+                            : unlocked
+                              ? 'hover:bg-muted'
+                              : 'opacity-40 cursor-not-allowed'
+                        }`}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={14} className={isActive ? 'text-primary-foreground' : 'text-green-500'} />
+                        ) : (
+                          <Circle size={14} className={isActive ? 'text-primary-foreground/60' : 'text-muted-foreground/40'} />
+                        )}
+                        <span className="truncate">{l.title}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
 
           {/* Certificate card in sidebar */}
@@ -278,7 +336,9 @@ export function TeacherProgramView({ program, modules }: Props) {
                     </div>
                   </div>
                   {currentModuleEvalData.evaluations.map((ev) => (
-                    <EvaluationCard key={ev.public_id} evaluation={ev} />
+                    <EvaluationCard key={ev.public_id} evaluation={ev} onSubmissionUpdate={(sub) => {
+                      setSubmissionMap((prev) => new Map(prev).set(ev.public_id, sub))
+                    }} />
                   ))}
                 </div>
               )}
@@ -311,7 +371,7 @@ export function TeacherProgramView({ program, modules }: Props) {
 
                 <button
                   onClick={goNext}
-                  disabled={currentIndex === totalLessons - 1}
+                  disabled={!canGoNext()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Siguiente <ArrowRight size={16} />
@@ -417,7 +477,7 @@ function CertificateStatus({ programId }: { programId: string }) {
 
 // ── Evaluation card ─────────────────────────────────────────────────────────
 
-function EvaluationCard({ evaluation }: { evaluation: TrainingEvaluation }) {
+function EvaluationCard({ evaluation, onSubmissionUpdate }: { evaluation: TrainingEvaluation; onSubmissionUpdate?: (sub: TrainingSubmission) => void }) {
   const [submission, setSubmission] = useState<TrainingSubmission | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
@@ -428,6 +488,11 @@ function EvaluationCard({ evaluation }: { evaluation: TrainingEvaluation }) {
       .then((s) => { setSubmission(s); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [evaluation.public_id])
+
+  function handleSubmission(sub: TrainingSubmission) {
+    setSubmission(sub)
+    onSubmissionUpdate?.(sub)
+  }
 
   const isGraded = submission?.status === 'GRADED'
   const passed = isGraded && submission.score !== null && submission.score >= evaluation.passing_score
@@ -467,14 +532,14 @@ function EvaluationCard({ evaluation }: { evaluation: TrainingEvaluation }) {
         <QuizModal
           evaluation={evaluation}
           onClose={() => setShowQuiz(false)}
-          onSubmitted={(sub) => { setSubmission(sub); setShowQuiz(false) }}
+          onSubmitted={(sub) => { handleSubmission(sub); setShowQuiz(false) }}
         />
       )}
       {showPractical && (
         <PracticalModal
           evaluationId={evaluation.public_id}
           onClose={() => setShowPractical(false)}
-          onSubmitted={(sub) => { setSubmission(sub); setShowPractical(false) }}
+          onSubmitted={(sub) => { handleSubmission(sub); setShowPractical(false) }}
         />
       )}
     </div>
