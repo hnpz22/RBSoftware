@@ -9,7 +9,11 @@ import {
   AreaHighlight,
 } from 'react-pdf-highlighter'
 import type { IHighlight, NewHighlight, ScaledPosition } from 'react-pdf-highlighter'
-import 'react-pdf-highlighter/dist/style.css'
+import 'react-pdf-highlighter/dist/style/AreaHighlight.css'
+import 'react-pdf-highlighter/dist/style/Highlight.css'
+import 'react-pdf-highlighter/dist/style/MouseSelection.css'
+import 'react-pdf-highlighter/dist/style/PdfHighlighter.css'
+import 'react-pdf-highlighter/dist/style/Tip.css'
 import { api } from '@/lib/api'
 
 const COLORS = [
