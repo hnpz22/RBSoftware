@@ -6,6 +6,7 @@ import {
   Award,
   BookOpen,
   BookOpenCheck,
+  Bot,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -128,36 +129,21 @@ export function Nav() {
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-blue-800 bg-[#1A237E] transition-all duration-200',
+        'fixed inset-y-0 left-0 z-50 flex flex-col bg-[#1A237E] transition-all duration-200',
         open ? 'translate-x-0' : '-translate-x-full',
         'md:translate-x-0',
         collapsed ? 'w-56 md:w-16' : 'w-56',
       )}
     >
       {/* Logo */}
-      <div className="flex h-14 items-center border-b border-blue-800 px-4">
-        {collapsed ? (
-          <div className="hidden h-8 w-8 items-center justify-center rounded-lg bg-[#FF6F00] text-sm font-black text-white md:flex">
-            RS
+      <div className="flex h-16 items-center border-b border-white/10 px-4">
+        <div className={cn('flex items-center gap-3', collapsed && 'md:justify-center md:w-full')}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6F00] to-[#FF8F00] shadow-lg shadow-[#FF6F00]/30">
+            <Bot size={20} className="text-white" />
           </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF6F00] text-sm font-black text-white">
-              RS
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold leading-tight text-white">RBSoftware</span>
-              <span className="text-xs leading-tight text-blue-300">ROBOTSchool</span>
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-2 md:hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF6F00] text-sm font-black text-white">
-            RS
-          </div>
-          <div className="flex flex-col">
+          <div className={cn('flex flex-col', collapsed && 'md:hidden')}>
             <span className="text-sm font-bold leading-tight text-white">RBSoftware</span>
-            <span className="text-xs leading-tight text-blue-300">ROBOTSchool</span>
+            <span className="text-xs font-medium leading-tight text-[#FF6F00]">by ROBOTSchool</span>
           </div>
         </div>
       </div>
@@ -165,13 +151,13 @@ export function Nav() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         {visibleSections.map((section) => (
-          <div key={section.title} className="mb-2">
+          <div key={section.title} className="mb-4">
             {!collapsed ? (
-              <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-blue-300">
+              <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/40">
                 {section.title}
               </p>
             ) : (
-              <div className="my-2 hidden border-t border-blue-800 md:block" />
+              <div className="my-2 hidden border-t border-white/10 md:block" />
             )}
 
             {section.items.map(({ href, label, icon: Icon, soon, disabled }) => {
@@ -185,7 +171,7 @@ export function Nav() {
                   <div
                     key={label}
                     className={cn(
-                      'flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-blue-400 opacity-60',
+                      'flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/30',
                       collapsed && 'md:justify-center md:px-0',
                     )}
                     title={collapsed ? label : undefined}
@@ -195,7 +181,7 @@ export function Nav() {
                       {label}
                     </span>
                     {soon && !collapsed && (
-                      <span className="ml-auto rounded-sm bg-blue-800 px-1.5 py-0.5 text-[10px] font-medium text-blue-300">
+                      <span className="ml-auto rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/40">
                         Soon
                       </span>
                     )}
@@ -209,15 +195,18 @@ export function Nav() {
                   href={href}
                   onClick={handleNavClick}
                   className={cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                     active
-                      ? 'bg-[#FF6F00] font-medium text-white'
-                      : 'text-blue-100 hover:bg-blue-800 hover:text-white',
+                      ? 'bg-[#FF6F00] font-medium text-white shadow-lg shadow-[#FF6F00]/30'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white',
                     collapsed && 'md:justify-center md:px-0',
                   )}
                   title={collapsed ? label : undefined}
                 >
-                  <Icon size={16} />
+                  <Icon
+                    size={16}
+                    className={active ? 'text-white' : 'text-[#FF6F00]'}
+                  />
                   <span className={cn(collapsed && 'md:hidden')}>
                     {label}
                   </span>
@@ -228,35 +217,38 @@ export function Nav() {
         ))}
       </nav>
 
-      {/* User + logout + collapse toggle */}
-      <div className="border-t border-blue-800 p-3">
+      {/* User card + actions */}
+      <div className="border-t border-white/10 p-3">
         {user && (
           <div
             className={cn(
-              'mb-2 flex items-center gap-2 px-1',
-              collapsed && 'md:justify-center',
+              'mb-2 flex items-center gap-3 rounded-xl bg-white/5 p-3 transition-colors hover:bg-white/10',
+              collapsed && 'md:justify-center md:p-2',
             )}
           >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FF6F00] text-xs font-bold text-white">
-              {initials}
+            <div className="relative shrink-0">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#FF6F00] bg-gradient-to-br from-[#FF6F00] to-[#FF8F00] text-sm font-bold text-white">
+                {initials}
+              </div>
+              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-400 shadow-lg shadow-green-400/50" />
             </div>
             <div className={cn('min-w-0 flex-1', collapsed && 'md:hidden')}>
-              <p className="truncate text-xs font-medium text-white">
+              <p className="truncate text-sm font-medium text-white">
                 {user.first_name} {user.last_name}
               </p>
-              <p className="truncate text-[10px] text-blue-300">{user.email}</p>
+              <p className="truncate text-xs text-white/50">
+                {user.position || user.email}
+              </p>
             </div>
           </div>
         )}
-        <div className={cn(
-          'flex items-center gap-1',
-          collapsed && 'md:flex-col',
-        )}>
+
+        <div className={cn('flex items-center gap-1', collapsed && 'md:flex-col')}>
           <button
             onClick={handleLogout}
             className={cn(
-              'flex flex-1 items-center gap-2 rounded-md px-3 py-2 text-sm text-blue-100 transition-colors hover:bg-blue-800 hover:text-white',
-              collapsed && 'md:justify-center md:px-0 md:flex-none',
+              'flex flex-1 items-center gap-2 rounded-lg p-2 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white',
+              collapsed && 'md:flex-none md:justify-center',
             )}
             title={collapsed ? 'Cerrar sesión' : undefined}
           >
@@ -271,7 +263,7 @@ export function Nav() {
               const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
               syncFromSystem(systemDark ? 'dark' : 'light')
             }}
-            className="rounded-md p-2 text-blue-300 transition-colors hover:bg-blue-800 hover:text-white"
+            className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
             title="Clic: alternar tema · Doble clic: seguir tema del sistema"
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
@@ -280,7 +272,7 @@ export function Nav() {
 
         <button
           onClick={toggleCollapsed}
-          className="mt-2 hidden w-full items-center justify-center rounded-md py-2 text-blue-300 transition-colors hover:bg-blue-800 hover:text-white md:flex"
+          className="mt-2 hidden w-full items-center justify-center rounded-lg py-2 text-white/40 transition-colors hover:bg-white/10 hover:text-white md:flex"
           title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Nav />
 
       <main
-        className={`flex-1 overflow-y-auto bg-background transition-[margin] duration-200 ${
+        className={`flex-1 overflow-y-auto bg-slate-50 dark:bg-background transition-[margin] duration-200 ${
           collapsed ? 'md:ml-16' : 'md:ml-56'
         }`}
       >

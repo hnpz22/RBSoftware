@@ -4,19 +4,18 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
+  AlertTriangle,
   BookOpen,
   CheckCircle,
   ClipboardList,
   Factory,
-  GraduationCap,
   Layers,
   Package,
   ShoppingCart,
+  TrendingDown,
   TrendingUp,
   Users2,
-  AlertTriangle,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorBanner } from '@/components/error-banner'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -35,64 +34,53 @@ import type {
 function StatCard({
   title,
   value,
+  subtitle,
   icon: Icon,
-  sub,
+  gradient,
+  trend,
   href,
-  alert,
 }: {
   title: string
   value: number | string
+  subtitle: string
   icon: React.ElementType
-  sub?: string
+  gradient: string
+  trend?: { value: number; isPositive: boolean }
   href?: string
-  alert?: boolean
 }) {
-  const content = (
-    <Card
-      className={`relative overflow-hidden ${
-        alert && (value as number) > 0
-          ? 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20'
-          : ''
-      }`}
+  const card = (
+    <div
+      className={`relative overflow-hidden rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${gradient}`}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-        alert && (value as number) > 0 ? 'bg-accent' : 'bg-primary'
-      }`} />
-      <CardHeader className="flex flex-row items-center justify-between pb-2 pl-5">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-        <Icon
-          size={18}
-          className={
-            alert && (value as number) > 0
-              ? 'text-red-500'
-              : 'text-muted-foreground'
-          }
-        />
-      </CardHeader>
-      <CardContent className="pl-5">
-        <p
-          className={`text-3xl font-bold ${alert && (value as number) > 0 ? 'text-red-600' : ''}`}
-        >
-          {value}
-        </p>
-        {sub && (
-          <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
-        )}
-        {href && (
-          <p className="mt-2 text-xs text-primary underline-offset-2 hover:underline">
-            Ver detalle →
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-medium text-white/90">{title}</p>
+        <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+      <p className="text-3xl font-bold text-white">{value}</p>
+      <p className="text-sm text-white/70 mt-1">{subtitle}</p>
+      {trend && (
+        <div className="inline-flex items-center gap-1 mt-3 px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white">
+          {trend.isPositive ? (
+            <TrendingUp className="h-3 w-3" />
+          ) : (
+            <TrendingDown className="h-3 w-3" />
+          )}
+          {trend.value}%
+        </div>
+      )}
+    </div>
   )
 
   if (href) {
-    return <Link href={href}>{content}</Link>
+    return (
+      <Link href={href} className="block">
+        {card}
+      </Link>
+    )
   }
-  return content
+  return card
 }
 
 // ── Role-specific panels ─────────────────────────────────────────────────────
@@ -100,9 +88,9 @@ function StatCard({
 function AdminPanel() {
   const [stats, setStats] = useState({
     pendingOrders: 0,
-    approvedOrders: 0,
     activeBatches: 0,
     criticalStock: 0,
+    activeCourses: 0,
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -118,11 +106,11 @@ function AdminPanel() {
       ])
       setStats({
         pendingOrders: orders.filter((o) => o.status === 'PENDING').length,
-        approvedOrders: orders.filter((o) => o.status === 'APPROVED').length,
         activeBatches: batches.filter((b) =>
           ['PENDING', 'IN_PROGRESS'].includes(b.status),
         ).length,
         criticalStock: alerts.filter((a) => a.status_color === 'RED').length,
+        activeCourses: 0,
       })
     } catch (err: any) {
       setError(err?.detail ?? 'Error al cargar el dashboard.')
@@ -131,38 +119,43 @@ function AdminPanel() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   if (loading) return <SkeletonCards count={4} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       <StatCard
-        title="Órdenes Pendientes"
+        title="Pedidos Pendientes"
         value={stats.pendingOrders}
+        subtitle="Órdenes por aprobar"
         icon={ShoppingCart}
-        sub="Por aprobar"
+        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
       />
       <StatCard
-        title="Órdenes Aprobadas"
-        value={stats.approvedOrders}
-        icon={TrendingUp}
-        sub="Listas para producción"
-      />
-      <StatCard
-        title="Batches Activos"
+        title="Lotes Activos"
         value={stats.activeBatches}
-        icon={Factory}
-        sub="En producción"
+        subtitle="En producción"
+        icon={Package}
+        gradient="bg-gradient-to-br from-orange-500 to-orange-700"
       />
       <StatCard
         title="Stock Crítico"
         value={stats.criticalStock}
+        subtitle="Productos sin unidades FREE"
         icon={AlertTriangle}
-        sub="Productos sin unidades FREE"
+        gradient="bg-gradient-to-br from-green-500 to-green-700"
         href="/inventory?color=RED"
-        alert
+      />
+      <StatCard
+        title="Cursos Activos"
+        value={stats.activeCourses}
+        subtitle="Cursos en el sistema"
+        icon={BookOpen}
+        gradient="bg-gradient-to-br from-purple-500 to-purple-700"
       />
     </div>
   )
@@ -202,33 +195,37 @@ function OperativoPanel() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   if (loading) return <SkeletonCards count={3} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <StatCard
-        title="Batches Activos"
+        title="Lotes Activos"
         value={stats.activeBatches}
+        subtitle="En producción"
         icon={Factory}
-        sub="En producción"
+        gradient="bg-gradient-to-br from-orange-500 to-orange-700"
         href="/production"
       />
       <StatCard
         title="Stock Crítico"
         value={stats.criticalStock}
+        subtitle="Productos sin unidades FREE"
         icon={AlertTriangle}
-        sub="Productos sin unidades FREE"
+        gradient="bg-gradient-to-br from-green-500 to-green-700"
         href="/inventory?color=RED"
-        alert
       />
       <StatCard
         title="En Fulfillment"
         value={stats.fulfillmentOrders}
+        subtitle="Órdenes en packing"
         icon={Package}
-        sub="Órdenes en packing"
+        gradient="bg-gradient-to-br from-cyan-500 to-cyan-700"
         href="/fulfillment"
       />
     </div>
@@ -264,31 +261,36 @@ function ComercialPanel() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   if (loading) return <SkeletonCards count={3} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <StatCard
         title="Órdenes Pendientes"
         value={stats.pendingOrders}
+        subtitle="Por aprobar"
         icon={ShoppingCart}
-        sub="Por aprobar"
+        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
         href="/orders"
       />
       <StatCard
         title="Órdenes Aprobadas"
         value={stats.approvedOrders}
+        subtitle="Listas para producción"
         icon={TrendingUp}
-        sub="Listas para producción"
+        gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
       />
       <StatCard
         title="Ventas Hoy"
         value={stats.todaySales}
+        subtitle="Órdenes creadas hoy"
         icon={ShoppingCart}
-        sub="Órdenes creadas hoy"
+        gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"
       />
     </div>
   )
@@ -318,25 +320,29 @@ function TeacherPanel() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   if (loading) return <SkeletonCards count={2} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <StatCard
         title="Mis Cursos Activos"
         value={stats.activeCourses}
+        subtitle="Cursos asignados"
         icon={BookOpen}
-        sub="Cursos asignados"
+        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
         href="/academic/courses"
       />
       <StatCard
         title="Por Calificar"
         value={stats.pendingGrading}
+        subtitle="Entregas pendientes de nota"
         icon={ClipboardList}
-        sub="Entregas pendientes de nota"
+        gradient="bg-gradient-to-br from-amber-500 to-amber-700"
       />
     </div>
   )
@@ -390,31 +396,36 @@ function DirectorPanel() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   if (loading) return <SkeletonCards count={3} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <StatCard
         title="Mis Grados"
         value={stats.gradesCount}
+        subtitle="Grados asignados"
         icon={Layers}
-        sub="Grados asignados"
+        gradient="bg-gradient-to-br from-purple-500 to-purple-700"
         href="/academic/grades"
       />
       <StatCard
         title="Total Estudiantes"
         value={stats.totalStudents}
+        subtitle="En mis grados"
         icon={Users2}
-        sub="En mis grados"
+        gradient="bg-gradient-to-br from-pink-500 to-pink-700"
       />
       <StatCard
         title="Cursos Activos"
         value={stats.activeCourses}
+        subtitle="En mis grados"
         icon={BookOpen}
-        sub="En mis grados"
+        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
       />
     </div>
   )
@@ -477,32 +488,36 @@ function StudentPanel() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   if (loading) return <SkeletonCards count={3} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <StatCard
         title="Mis Cursos"
         value={stats.coursesCount}
+        subtitle="Cursos matriculados"
         icon={BookOpen}
-        sub="Cursos matriculados"
+        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
         href="/academic/courses"
       />
       <StatCard
         title="Tareas Pendientes"
         value={stats.pendingAssignments}
+        subtitle="Sin entregar"
         icon={ClipboardList}
-        sub="Sin entregar"
-        alert
+        gradient="bg-gradient-to-br from-rose-500 to-rose-700"
       />
       <StatCard
         title="Calificadas esta Semana"
         value={stats.gradedThisWeek}
+        subtitle="Últimos 7 días"
         icon={CheckCircle}
-        sub="Últimos 7 días"
+        gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
       />
     </div>
   )
@@ -511,14 +526,16 @@ function StudentPanel() {
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
 function SkeletonCards({ count }: { count: number }) {
+  const cols =
+    count === 2
+      ? 'lg:grid-cols-2'
+      : count === 3
+        ? 'lg:grid-cols-3'
+        : 'lg:grid-cols-4'
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${cols} gap-6`}>
       {Array.from({ length: count }).map((_, i) => (
-        <Card key={i}>
-          <CardContent className="p-6">
-            <div className="h-10 animate-pulse rounded bg-muted" />
-          </CardContent>
-        </Card>
+        <div key={i} className="h-36 rounded-xl bg-muted animate-pulse" />
       ))}
     </div>
   )
@@ -586,13 +603,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-foreground">
-          Bienvenido, {user?.first_name ?? ''} 👋
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {getSubtitle(roles)}
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            Bienvenido, {user?.first_name ?? ''} 👋
+          </h1>
+          <p className="text-muted-foreground mt-1">{getSubtitle(roles)}</p>
+        </div>
       </div>
 
       {getPanelForRoles(roles)}
