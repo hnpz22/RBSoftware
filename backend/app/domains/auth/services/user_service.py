@@ -156,7 +156,16 @@ class UserService:
         course_student_repo = CourseStudentRepository(session)
         academic_svc = AcademicService()
 
-        content = csv_bytes.decode("utf-8")
+        try:
+            content = csv_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            try:
+                content = csv_bytes.decode("cp1252")
+            except UnicodeDecodeError:
+                raise ValueError(
+                    "No se pudo decodificar el archivo. "
+                    "Guárdalo como UTF-8 o como CSV de Excel."
+                )
         first_line = content.split("\n")[0]
         delimiter = ";" if first_line.count(";") > first_line.count(",") else ","
         try:
