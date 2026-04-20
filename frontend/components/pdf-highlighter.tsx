@@ -197,7 +197,7 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
                       updateHighlight(
                         highlight.id,
                         {
-                          boundingRect,
+                          boundingRect: _viewportToScaled(boundingRect),
                           pageNumber: highlight.position.pageNumber,
                         },
                         { image: screenshot(boundingRect) },
