@@ -319,6 +319,7 @@ export interface MaterialRead {
   type: string
   content: string | null
   file_key: string | null
+  has_file: boolean
   order_index: number
   is_published: boolean
   created_at: string
