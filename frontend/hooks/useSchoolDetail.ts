@@ -22,6 +22,7 @@ export function useSchoolDetail(schoolId: string) {
         basicGrades.map((g: Grade) =>
           academicService.getGrade(g.public_id).catch(() => ({
             ...g,
+            school_public_id: schoolId,
             courses: [],
             director: null,
           } as GradeWithCourses)),
