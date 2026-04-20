@@ -52,7 +52,7 @@ class StorageService:
         )
         url = url.replace(
             f"http://{settings.minio_endpoint}",
-            f"http://{settings.minio_public_endpoint}/storage",
+            f"{settings.minio_public_scheme}://{settings.minio_public_endpoint}/storage",
             1,
         )
         return url

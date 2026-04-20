@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # MinIO / S3 storage
     minio_endpoint: str = "minio:9000"
     minio_public_endpoint: str = "localhost:8080"
+    minio_public_scheme: str = "http"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "rbsoftware"
