@@ -9,6 +9,7 @@ from sqlmodel import Session
 from app.domains.audit.services import AuditService
 
 from app.core.database import get_session
+from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.schemas import UserRead
@@ -44,7 +45,7 @@ class ChangePasswordRequest(BaseModel):
 @router.get("", response_model=list[UserRead])
 def list_users(
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ):
     return _svc.list_users(session)
 
@@ -54,7 +55,7 @@ def update_user(
     user_id: UUID,
     data: UpdateUserRequest,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ) -> UserRead:
     user = _svc.update_user(
         session,
@@ -74,7 +75,7 @@ def update_user(
 def create_user(
     data: CreateUserRequest,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN")),
 ) -> UserRead:
     try:
         user = _svc.register(
