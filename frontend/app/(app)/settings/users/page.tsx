@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, RefreshCw, X } from 'lucide-react'
+import { Download, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import type { Grade, Role, School, User } from '@/lib/types'
+import type { CourseRead, Grade, Role, School, User } from '@/lib/types'
 
 // ── Create user modal ─────────────────────────────────────────────────────────
 
@@ -804,12 +804,96 @@ function UserPanel({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+type ImportResult = {
+  created: string[]
+  errors: { row: number; email: string; error: string }[]
+  total: number
+  success_count: number
+  error_count: number
+}
+
 export default function SettingsUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [importSchools, setImportSchools] = useState<School[]>([])
+  const [importGrades, setImportGrades] = useState<Grade[]>([])
+  const [importCourses, setImportCourses] = useState<(CourseRead & { label: string })[]>([])
+  const [selectedSchool, setSelectedSchool] = useState('')
+  const [selectedCourse, setSelectedCourse] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!showImport) return
+    api.get<School[]>('/academic/schools')
+      .then(setImportSchools)
+      .catch(() => {})
+  }, [showImport])
+
+  useEffect(() => {
+    if (!selectedSchool) {
+      setImportGrades([])
+      setImportCourses([])
+      setSelectedCourse('')
+      return
+    }
+    api.get<Grade[]>(`/academic/schools/${selectedSchool}/grades`)
+      .then(async (grades) => {
+        setImportGrades(grades)
+        const allCourses: (CourseRead & { label: string })[] = []
+        for (const grade of grades) {
+          const courses = await api.get<CourseRead[]>(
+            `/academic/grades/${grade.public_id}/courses`
+          )
+          courses.forEach((c) => {
+            allCourses.push({ ...c, label: `${grade.name} — ${c.name}` })
+          })
+        }
+        setImportCourses(allCourses)
+      })
+      .catch(() => {})
+  }, [selectedSchool])
+
+  function downloadTemplate() {
+    const rows = [
+      'nombre,apellido,email,password,telefono',
+      'Juan,Pérez,juan@email.com,Estudiante123!,3001234567',
+      'Ana,López,ana@email.com,Estudiante123!,3009876543',
+    ]
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'plantilla_estudiantes.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleImport() {
+    if (!importFile || !selectedSchool || !selectedCourse) return
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', importFile)
+      formData.append('school_id', selectedSchool)
+      formData.append('course_id', selectedCourse)
+      const result = await api.postForm<ImportResult>(
+        '/auth/users/import-csv',
+        formData,
+      )
+      setImportResult(result)
+    } catch (err: any) {
+      setImportError(err?.detail ?? 'Error al importar el archivo')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -846,6 +930,168 @@ export default function SettingsUsersPage() {
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
 
+      {showImport && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-card">
+              <h2 className="font-semibold text-lg">Importar estudiantes</h2>
+              <button onClick={() => { setShowImport(false); setImportResult(null); setImportError(null) }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {!importResult ? (
+                <>
+                  <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
+                    <p className="font-medium">Instrucciones:</p>
+                    <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
+                      <li>Descarga la plantilla CSV</li>
+                      <li>Completa los datos de los estudiantes</li>
+                      <li>Selecciona el colegio y el curso</li>
+                      <li>Sube el archivo y clic en Importar</li>
+                    </ol>
+                    <button
+                      onClick={downloadTemplate}
+                      className="flex items-center gap-2 text-primary hover:underline text-sm font-medium mt-2"
+                    >
+                      <Download size={14} />
+                      Descargar plantilla CSV
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">
+                      Colegio<span className="text-destructive ml-1">*</span>
+                    </label>
+                    <select
+                      value={selectedSchool}
+                      onChange={(e) => { setSelectedSchool(e.target.value); setSelectedCourse('') }}
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">Seleccionar colegio...</option>
+                      {importSchools.map((s) => (
+                        <option key={s.public_id} value={s.public_id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedSchool && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">
+                        Curso<span className="text-destructive ml-1">*</span>
+                      </label>
+                      <select
+                        value={selectedCourse}
+                        onChange={(e) => setSelectedCourse(e.target.value)}
+                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Seleccionar curso...</option>
+                        {importCourses.map((c) => (
+                          <option key={c.public_id} value={c.public_id}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedCourse && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">
+                        Archivo CSV<span className="text-destructive ml-1">*</span>
+                      </label>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => {
+                          setImportFile(e.target.files?.[0] ?? null)
+                          setImportError(null)
+                        }}
+                        className="w-full text-sm border rounded-lg p-2 bg-background"
+                      />
+                      {importFile && (
+                        <p className="text-xs text-muted-foreground">
+                          {importFile.name} — {(importFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-green-500/10 p-4 text-center">
+                      <p className="text-3xl font-bold text-green-600">{importResult.success_count}</p>
+                      <p className="text-xs text-green-600 mt-1">Creados exitosamente</p>
+                    </div>
+                    <div className="rounded-lg bg-destructive/10 p-4 text-center">
+                      <p className="text-3xl font-bold text-destructive">{importResult.error_count}</p>
+                      <p className="text-xs text-destructive mt-1">Con errores</p>
+                    </div>
+                  </div>
+
+                  {importResult.errors.length > 0 && (
+                    <div className="rounded-lg border border-destructive/20 overflow-hidden">
+                      <div className="bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                        Detalle de errores
+                      </div>
+                      <div className="max-h-48 overflow-y-auto divide-y">
+                        {importResult.errors.map((err, i) => (
+                          <div key={i} className="px-3 py-2 text-xs flex flex-col gap-0.5">
+                            <span className="font-medium">Fila {err.row}: {err.email}</span>
+                            <span className="text-destructive">{err.error}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {importError && (
+              <div className="mx-6 mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+                {importError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 p-6 border-t sticky bottom-0 bg-card">
+              {importResult ? (
+                <button
+                  onClick={() => {
+                    setShowImport(false)
+                    setImportResult(null)
+                    setImportFile(null)
+                    setSelectedSchool('')
+                    setSelectedCourse('')
+                    setImportError(null)
+                    load()
+                  }}
+                  className="px-4 py-2 rounded-lg bg-primary text-white font-medium"
+                >
+                  Cerrar y actualizar lista
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setShowImport(false); setImportError(null) }}
+                    className="px-4 py-2 rounded-lg border hover:bg-muted text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={!importFile || !selectedSchool || !selectedCourse || importing}
+                    className="px-4 py-2 rounded-lg bg-primary text-white font-medium text-sm disabled:opacity-50"
+                  >
+                    {importing ? 'Importando...' : 'Importar'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex h-full gap-0">
         {/* Main content */}
         <div className="flex-1 space-y-4 overflow-auto">
@@ -859,6 +1105,20 @@ export default function SettingsUsersPage() {
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 <span className="ml-2">Actualizar</span>
               </Button>
+              <button
+                onClick={() => {
+                  setShowImport(true)
+                  setImportFile(null)
+                  setImportResult(null)
+                  setSelectedSchool('')
+                  setSelectedCourse('')
+                  setImportError(null)
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted text-sm"
+              >
+                <Upload size={16} />
+                Importar CSV
+              </button>
               <Button size="sm" onClick={() => setShowCreate(true)}>
                 <Plus size={14} />
                 <span className="ml-2">Nuevo usuario</span>

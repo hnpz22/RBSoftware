@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlmodel import Session
 
@@ -119,3 +119,41 @@ def change_password(
         ip=request.client.host if request.client else None,
     )
     return {"message": "Password updated"}
+
+
+@router.post("/import-csv", status_code=status.HTTP_200_OK)
+def import_students_csv(
+    file: UploadFile = File(...),
+    school_id: str = Form(...),
+    course_id: str = Form(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    from app.domains.rbac.repositories.user_role_repository import UserRoleRepository
+
+    roles = UserRoleRepository(session).get_role_names_for_user(current_user.id)
+    if "ADMIN" not in [r.upper() for r in roles]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden importar usuarios",
+        )
+
+    csv_bytes = file.file.read()
+    if not csv_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo está vacío",
+        )
+
+    try:
+        return _svc.import_from_csv(
+            session,
+            csv_bytes=csv_bytes,
+            school_public_id=school_id,
+            course_public_id=course_id,
+            requesting_user_id=current_user.id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
