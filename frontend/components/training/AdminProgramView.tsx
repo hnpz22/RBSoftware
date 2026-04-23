@@ -384,7 +384,22 @@ function ContentTab({ program, modules, reload }: Props) {
                               </p>
                             </div>
                           </div>
-                          <Badge variant={ev.is_published ? 'success' : 'secondary'} className="text-[10px]">{ev.is_published ? 'Publicada' : 'Borrador'}</Badge>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              await api.post(`/training/evaluations/${ev.public_id}/publish`, {
+                                publish: !ev.is_published,
+                              })
+                              reloadModuleContent()
+                            }}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                              ev.is_published
+                                ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
+                                : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
+                            }`}
+                          >
+                            {ev.is_published ? 'Publicada' : 'Borrador'}
+                          </button>
                         </div>
                         {selectedEvalId === ev.public_id && ev.type === 'QUIZ' && (
                           <div className="ml-6 mt-2 space-y-2 border-l-2 border-primary/20 pl-4">

@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.database import get_session
@@ -86,6 +87,28 @@ def update_evaluation(
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
     return _svc.build_evaluation_read(session, updated)
+
+
+class PublishEvalRequest(BaseModel):
+    publish: bool = True
+
+
+@router.post(
+    "/evaluations/{evaluation_id}/publish",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def publish_evaluation(
+    evaluation_id: UUID,
+    body: PublishEvalRequest = PublishEvalRequest(),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+):
+    evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
+    if evaluation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Evaluación no encontrada")
+    evaluation.is_published = body.publish
+    session.add(evaluation)
+    session.commit()
 
 
 @router.get("/evaluations/{evaluation_id}/questions")
