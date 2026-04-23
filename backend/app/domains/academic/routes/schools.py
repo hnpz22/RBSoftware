@@ -29,7 +29,7 @@ class TeacherBody(BaseModel):
 @router.get("/schools", response_model=list[SchoolRead])
 def list_schools(
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     return [SchoolRead.model_validate(s) for s in SchoolRepository(session).list()]
 
@@ -109,7 +109,7 @@ def create_grade(
 def list_school_teachers(
     school_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR", "TRAINER", "SUPER_TRAINER")),
 ):
     school = SchoolRepository(session).get_by_public_id(school_id)
     if school is None:

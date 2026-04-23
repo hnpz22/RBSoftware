@@ -176,7 +176,7 @@ class AcademicService:
     ) -> list[UserRead]:
         if not self._is_admin(session, requesting_user_id):
             roles = UserRoleRepository(session).get_role_names_for_user(requesting_user_id)
-            if "TRAINER" not in roles:
+            if "TRAINER" not in roles and "SUPER_TRAINER" not in roles:
                 grades = GradeDirectorRepository(session).get_grades_for_director(
                     requesting_user_id
                 )
