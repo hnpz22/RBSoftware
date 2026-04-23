@@ -175,14 +175,16 @@ class AcademicService:
         requesting_user_id: int,
     ) -> list[UserRead]:
         if not self._is_admin(session, requesting_user_id):
-            grades = GradeDirectorRepository(session).get_grades_for_director(
-                requesting_user_id
-            )
-            school_ids = {g.school_id for g in grades}
-            if school_id not in school_ids:
-                raise PermissionError(
-                    "Solo administradores o directores del colegio pueden ver docentes"
+            roles = UserRoleRepository(session).get_role_names_for_user(requesting_user_id)
+            if "TRAINER" not in roles:
+                grades = GradeDirectorRepository(session).get_grades_for_director(
+                    requesting_user_id
                 )
+                school_ids = {g.school_id for g in grades}
+                if school_id not in school_ids:
+                    raise PermissionError(
+                        "Solo administradores, directores del colegio o trainers pueden ver docentes"
+                    )
 
         members = SchoolTeacherRepository(session).list_teachers(school_id)
         role_repo = UserRoleRepository(session)

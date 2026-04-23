@@ -33,6 +33,8 @@ import type {
   QuizQuestion,
 } from '@/services/training'
 import * as trainingService from '@/services/training'
+import * as academicService from '@/services/academic'
+import type { School, User } from '@/lib/types'
 
 interface Props {
   program: TrainingProgram
@@ -442,7 +444,7 @@ function ContentTab({ program, modules, reload }: Props) {
 // ── Enrolled Tab ────────────────────────────────────────────────────────────
 
 function EnrolledTab({ program }: { program: TrainingProgram }) {
-  const { isAdmin } = useAuthStore()
+  const { isAdmin, hasRole } = useAuthStore()
   const [progress, setProgress] = useState<TrainingEnrollmentProgress[]>([])
   const [loading, setLoading] = useState(true)
   const [showEnroll, setShowEnroll] = useState(false)
@@ -453,11 +455,11 @@ function EnrolledTab({ program }: { program: TrainingProgram }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      {showEnroll && <EnrollTeacherModal programId={program.public_id} onClose={() => setShowEnroll(false)}
+      {showEnroll && <EnrollTeacherModal programId={program.public_id} enrolledIds={progress.map((p) => p.user.public_id)} onClose={() => setShowEnroll(false)}
         onEnrolled={() => { setShowEnroll(false); trainingService.getProgramProgress(program.public_id).then(setProgress) }} />}
 
       <div className="flex justify-end mb-3">
-        {isAdmin() && <Button size="sm" onClick={() => setShowEnroll(true)}><Plus size={14} className="mr-1" /> Inscribir docente</Button>}
+        {(isAdmin() || hasRole('TRAINER')) && <Button size="sm" onClick={() => setShowEnroll(true)}><Plus size={14} className="mr-1" /> Inscribir docente</Button>}
       </div>
 
       {loading && <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>}
@@ -1000,33 +1002,139 @@ function CreateQuestionModal({ evaluationId, onClose, onCreated }: {
   )
 }
 
-function EnrollTeacherModal({ programId, onClose, onEnrolled }: {
-  programId: string; onClose: () => void; onEnrolled: () => void
+function EnrollTeacherModal({ programId, enrolledIds, onClose, onEnrolled }: {
+  programId: string; enrolledIds: string[]; onClose: () => void; onEnrolled: () => void
 }) {
-  const [email, setEmail] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [schools, setSchools] = useState<School[]>([])
+  const [selectedSchool, setSelectedSchool] = useState('')
+  const [teachers, setTeachers] = useState<User[]>([])
+  const [selectedTeachers, setSelectedTeachers] = useState<string[]>([])
+  const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    academicService.listSchools().then(setSchools).catch(() => setSchools([]))
+  }, [])
+
+  useEffect(() => {
+    if (!selectedSchool) {
+      setTeachers([])
+      return
+    }
+    academicService.listSchoolTeachers(selectedSchool).then(setTeachers).catch(() => setTeachers([]))
+  }, [selectedSchool])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-sm rounded-lg border bg-card shadow-xl">
+      <div className="w-full max-w-md rounded-lg border bg-card shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h3 className="font-semibold">Inscribir docente</h3>
-          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted"><X size={16} /></button></div>
-        <form onSubmit={async (e) => {
-          e.preventDefault(); setError(null); setSaving(true)
-          try {
-            const users = await api.get<{ public_id: string; email: string }[]>('/auth/users')
-            const user = users.find((u) => u.email === email.trim())
-            if (!user) { setError('Usuario no encontrado'); setSaving(false); return }
-            await trainingService.enrollTeacher(programId, user.public_id); onEnrolled()
-          } catch (err: any) { setError(err?.detail ?? 'Error al inscribir') } finally { setSaving(false) }
-        }} className="space-y-3 px-5 py-4">
-          <div className="space-y-1"><label className="text-xs font-medium">Email del docente *</label>
-            <Input required type="email" placeholder="docente@colegio.edu" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted"><X size={16} /></button>
+        </div>
+        <div className="space-y-3 px-5 py-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Colegio</label>
+            <select
+              value={selectedSchool}
+              onChange={(e) => {
+                setSelectedSchool(e.target.value)
+                setSelectedTeachers([])
+              }}
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Seleccionar colegio...</option>
+              {schools.map((s) => (
+                <option key={s.public_id} value={s.public_id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedSchool && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                Docentes del colegio
+                {selectedTeachers.length > 0 && (
+                  <span className="ml-2 text-xs text-primary font-normal">
+                    {selectedTeachers.length} seleccionado(s)
+                  </span>
+                )}
+              </label>
+              {teachers.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3 text-center border rounded-lg">
+                  No hay docentes en este colegio
+                </p>
+              ) : (
+                <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+                  {teachers.map((teacher) => {
+                    const isSelected = selectedTeachers.includes(teacher.public_id)
+                    const isAlreadyEnrolled = enrolledIds.includes(teacher.public_id)
+                    return (
+                      <label
+                        key={teacher.public_id}
+                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${isAlreadyEnrolled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={isAlreadyEnrolled}
+                          onChange={() => {
+                            if (isAlreadyEnrolled) return
+                            setSelectedTeachers((prev) =>
+                              isSelected
+                                ? prev.filter((id) => id !== teacher.public_id)
+                                : [...prev, teacher.public_id],
+                            )
+                          }}
+                          className="rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {teacher.first_name} {teacher.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {teacher.email}
+                          </p>
+                        </div>
+                        {isAlreadyEnrolled && (
+                          <span className="text-xs text-green-600 shrink-0">
+                            Ya inscrito
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" size="sm" disabled={saving}>{saving ? 'Inscribiendo…' : 'Inscribir'}</Button></div>
-        </form></div></div>
+
+          <button
+            onClick={async () => {
+              if (selectedTeachers.length === 0) return
+              setEnrolling(true)
+              setError(null)
+              try {
+                for (const userId of selectedTeachers) {
+                  await trainingService.enrollTeacher(programId, userId)
+                }
+                onEnrolled()
+              } catch (err: any) {
+                setError(err?.detail ?? 'Error al inscribir')
+              } finally {
+                setEnrolling(false)
+              }
+            }}
+            disabled={selectedTeachers.length === 0 || enrolling}
+            className="w-full py-2 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50"
+          >
+            {enrolling
+              ? 'Inscribiendo...'
+              : `Inscribir${selectedTeachers.length > 0 ? ` (${selectedTeachers.length})` : ''}`}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -109,7 +109,7 @@ def create_grade(
 def list_school_teachers(
     school_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR")),
+    current_user: User = Depends(require_roles("ADMIN", "DIRECTOR", "TRAINER")),
 ):
     school = SchoolRepository(session).get_by_public_id(school_id)
     if school is None:

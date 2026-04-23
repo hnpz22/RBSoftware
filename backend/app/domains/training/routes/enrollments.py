@@ -50,7 +50,7 @@ def enroll_teacher(
     program_id: UUID,
     body: EnrollBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
 ):
     user = UserRepository(session).get_by_public_id(body.user_id)
     if user is None:
