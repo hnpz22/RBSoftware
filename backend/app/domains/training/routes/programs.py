@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.database import get_session
@@ -91,14 +92,19 @@ def update_program(
     return ProgramRead.model_validate(program)
 
 
+class PublishRequest(BaseModel):
+    publish: bool = True
+
+
 @router.post("/programs/{program_id}/publish", status_code=status.HTTP_204_NO_CONTENT)
 def publish_program(
     program_id: UUID,
+    body: PublishRequest = PublishRequest(),
     session: Session = Depends(get_session),
     current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
 ):
     try:
-        _svc.publish_program(session, program_id, current_user.id, publish=True)
+        _svc.publish_program(session, program_id, current_user.id, publish=body.publish)
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
     except PermissionError as exc:

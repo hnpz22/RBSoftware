@@ -68,9 +68,31 @@ export function AdminProgramView({ program, modules, reload }: Props) {
         </button>
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-semibold">{program.name}</h1>
-          <Badge variant={program.is_published ? 'success' : 'secondary'}>
-            {program.is_published ? 'Publicado' : 'Borrador'}
-          </Badge>
+          <button
+            onClick={async () => {
+              await api.post(`/training/programs/${program.public_id}/publish`, {
+                publish: !program.is_published,
+              })
+              reload()
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              program.is_published
+                ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
+                : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
+            }`}
+          >
+            {program.is_published ? (
+              <>
+                <Eye size={12} />
+                Publicado
+              </>
+            ) : (
+              <>
+                <EyeOff size={12} />
+                Borrador
+              </>
+            )}
+          </button>
         </div>
         {program.description && (
           <p className="text-xs text-muted-foreground">{program.description}</p>
@@ -129,6 +151,13 @@ function ContentTab({ program, modules, reload }: Props) {
 
   const selectedModule = modules.find((m) => m.public_id === selectedModuleId) ?? null
 
+  const [previewLesson, setPreviewLesson] = useState<{
+    id: string
+    title: string
+    type: string
+  } | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
   useEffect(() => {
     if (!selectedModuleId) return
     trainingService.listLessons(selectedModuleId).then(setLessons).catch(() => setLessons([]))
@@ -183,6 +212,44 @@ function ContentTab({ program, modules, reload }: Props) {
       {showCreateLesson && selectedModuleId && <CreateLessonModal moduleId={selectedModuleId} onClose={() => setShowCreateLesson(false)} onCreated={() => { setShowCreateLesson(false); reloadModuleContent() }} />}
       {showCreateEval && selectedModuleId && <CreateEvaluationModal moduleId={selectedModuleId} onClose={() => setShowCreateEval(false)} onCreated={() => { setShowCreateEval(false); reloadModuleContent() }} />}
       {showCreateQuestion && selectedEvalId && <CreateQuestionModal evaluationId={selectedEvalId} onClose={() => setShowCreateQuestion(false)} onCreated={() => { setShowCreateQuestion(false); trainingService.listQuestions(selectedEvalId).then(setQuestions) }} />}
+
+      {previewLesson && previewUrl && (
+        <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div className="flex items-center gap-2">
+                {previewLesson.type === 'PDF' ? (
+                  <FileText size={18} className="text-red-500" />
+                ) : (
+                  <Video size={18} className="text-blue-500" />
+                )}
+                <span className="font-medium">{previewLesson.title}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setPreviewLesson(null)
+                  setPreviewUrl(null)
+                }}
+                className="p-2 rounded-lg hover:bg-muted"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {previewLesson.type === 'PDF' && (
+                <iframe
+                  src={`${previewUrl}#toolbar=0`}
+                  className="w-full h-full border-0"
+                  title={previewLesson.title}
+                />
+              )}
+              {previewLesson.type === 'VIDEO' && (
+                <video src={previewUrl} controls className="w-full h-full bg-black" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Modules sidebar */}
@@ -258,23 +325,38 @@ function ContentTab({ program, modules, reload }: Props) {
                             <p className="text-xs text-muted-foreground">{l.type}{l.duration_minutes ? ` · ${l.duration_minutes} min` : ''}</p>
                           </div>
                         </div>
-                        {l.is_published ? (
-                          <button
-                            onClick={() => toggleLesson(l.public_id, false)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
-                          >
-                            <Eye size={10} />
-                            Publicada
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => toggleLesson(l.public_id, true)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700 transition-colors"
-                          >
-                            <EyeOff size={10} />
-                            Borrador
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {(l.type === 'PDF' || l.type === 'VIDEO') && (
+                            <button
+                              onClick={async () => {
+                                const { url } = await trainingService.getLessonViewUrl(l.public_id)
+                                setPreviewUrl(url)
+                                setPreviewLesson({ id: l.public_id, title: l.title, type: l.type })
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Ver archivo"
+                            >
+                              <Eye size={14} />
+                            </button>
+                          )}
+                          {l.is_published ? (
+                            <button
+                              onClick={() => toggleLesson(l.public_id, false)}
+                              className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
+                            >
+                              <Eye size={10} />
+                              Publicada
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => toggleLesson(l.public_id, true)}
+                              className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700 transition-colors"
+                            >
+                              <EyeOff size={10} />
+                              Borrador
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
