@@ -98,6 +98,41 @@ def update_lesson(
     return LessonRead.model_validate(updated)
 
 
+class ReorderBody(BaseModel):
+    lesson_ids: list[UUID]
+
+
+@router.put(
+    "/modules/{module_id}/lessons/reorder",
+    response_model=list[LessonRead],
+)
+def reorder_lessons(
+    module_id: UUID,
+    body: ReorderBody,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+):
+    module = ModuleRepository(session).get_by_public_id(module_id)
+    if module is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Módulo no encontrado")
+    repo = LessonRepository(session)
+    lessons = []
+    for i, lesson_id in enumerate(body.lesson_ids):
+        lesson = repo.get_by_public_id(lesson_id)
+        if lesson is None or lesson.module_id != module.id:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Lección {lesson_id} no pertenece al módulo",
+            )
+        lesson.order_index = i
+        session.add(lesson)
+        lessons.append(lesson)
+    session.commit()
+    for l in lessons:
+        session.refresh(l)
+    return [LessonRead.model_validate(l) for l in lessons]
+
+
 class PublishBody(BaseModel):
     publish: bool
 

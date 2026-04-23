@@ -7,6 +7,8 @@ import {
   Award,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ClipboardCheck,
   Download,
   Eye,
@@ -151,6 +153,30 @@ function ContentTab({ program, modules, reload }: Props) {
     reloadModuleContent()
   }
 
+  async function moveLessonUp(lessonId: string) {
+    if (!selectedModuleId) return
+    const idx = lessons.findIndex((l) => l.public_id === lessonId)
+    if (idx <= 0) return
+    const newOrder = [...lessons]
+    ;[newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]]
+    await api.put(`/training/modules/${selectedModuleId}/lessons/reorder`, {
+      lesson_ids: newOrder.map((l) => l.public_id),
+    })
+    reloadModuleContent()
+  }
+
+  async function moveLessonDown(lessonId: string) {
+    if (!selectedModuleId) return
+    const idx = lessons.findIndex((l) => l.public_id === lessonId)
+    if (idx < 0 || idx >= lessons.length - 1) return
+    const newOrder = [...lessons]
+    ;[newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]]
+    await api.put(`/training/modules/${selectedModuleId}/lessons/reorder`, {
+      lesson_ids: newOrder.map((l) => l.public_id),
+    })
+    reloadModuleContent()
+  }
+
   return (
     <>
       {showCreateModule && <CreateModuleModal programId={program.public_id} orderIndex={modules.length} onClose={() => setShowCreateModule(false)} onCreated={() => { setShowCreateModule(false); reload() }} />}
@@ -205,9 +231,25 @@ function ContentTab({ program, modules, reload }: Props) {
                   <div className="space-y-2">
                     <div className="flex justify-end"><Button size="sm" onClick={() => setShowCreateLesson(true)}><Plus size={14} className="mr-1" /> Nueva lección</Button></div>
                     {lessons.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Sin lecciones</p>}
-                    {lessons.map((l) => (
+                    {lessons.map((l, i) => (
                       <div key={l.public_id} className="flex items-center justify-between rounded-lg border p-3">
                         <div className="flex items-center gap-3">
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              onClick={() => moveLessonUp(l.public_id)}
+                              disabled={i === 0}
+                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
+                            >
+                              <ChevronUp size={12} />
+                            </button>
+                            <button
+                              onClick={() => moveLessonDown(l.public_id)}
+                              disabled={i === lessons.length - 1}
+                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
+                            >
+                              <ChevronDown size={12} />
+                            </button>
+                          </div>
                           {l.type === 'PDF' && <FileText size={16} className="text-red-500" />}
                           {l.type === 'VIDEO' && <Video size={16} className="text-blue-500" />}
                           {l.type === 'TEXT' && <BookOpen size={16} className="text-muted-foreground" />}

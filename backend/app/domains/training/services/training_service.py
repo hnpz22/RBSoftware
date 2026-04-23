@@ -174,9 +174,11 @@ class TrainingService:
                 file_bytes, file_key, content_type or "application/octet-stream"
             )
 
-        data_with_file = LessonCreate.model_validate(
-            data.model_dump() | ({"file_key": file_key} if file_key else {})
-        )
+        existing = LessonRepository(session).list_by_module(module.id)
+        overrides: dict = {"order_index": len(existing)}
+        if file_key:
+            overrides["file_key"] = file_key
+        data_with_file = LessonCreate.model_validate(data.model_dump() | overrides)
         return LessonRepository(session).create(module.id, data_with_file)
 
     # ── Evaluation management ────────────────────────────────────────────────
