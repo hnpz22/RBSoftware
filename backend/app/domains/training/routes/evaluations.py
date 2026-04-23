@@ -9,6 +9,7 @@ from sqlmodel import Session
 from app.core.database import get_session
 from app.core.permissions import require_roles
 from app.domains.auth.dependencies import get_current_user
+from app.domains.academic.repositories.rubric_repository import RubricRepository
 from app.domains.auth.models import User
 from app.domains.rbac.repositories import UserRoleRepository
 from app.domains.training.repositories.evaluation_repository import EvaluationRepository
@@ -170,3 +171,53 @@ def delete_question(
     if question is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Pregunta no encontrada")
     QuizQuestionRepository(session).delete(question)
+
+
+class _RubricLevelBody(BaseModel):
+    title: str
+    description: str | None = None
+    points: int
+
+
+class _RubricCriteriaBody(BaseModel):
+    title: str
+    description: str | None = None
+    weight: int = 1
+    levels: list[_RubricLevelBody] = []
+
+
+class RubricBody(BaseModel):
+    title: str
+    description: str | None = None
+    criteria: list[_RubricCriteriaBody] = []
+
+
+@router.get("/evaluations/{evaluation_id}/rubric")
+def get_evaluation_rubric(
+    evaluation_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
+    if evaluation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Evaluación no encontrada")
+    repo = RubricRepository(session)
+    rubric = repo.get_by_evaluation(evaluation.id)
+    if rubric is None:
+        return None
+    return repo.get_full(rubric.id)
+
+
+@router.put("/evaluations/{evaluation_id}/rubric")
+def upsert_evaluation_rubric(
+    evaluation_id: UUID,
+    body: RubricBody,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
+):
+    evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
+    if evaluation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Evaluación no encontrada")
+    repo = RubricRepository(session)
+    rubric = repo.upsert_full(body.model_dump(), evaluation_id=evaluation.id)
+    return repo.get_full(rubric.id)

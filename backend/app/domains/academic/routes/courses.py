@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict
 from sqlmodel import Session
 
 from app.core.database import get_session
-from app.domains.academic.repositories import CourseRepository
+from app.domains.academic.repositories import (
+    AssignmentRepository,
+    CourseRepository,
+    RubricRepository,
+)
 from app.domains.academic.schemas import (
     AssignmentRead, CourseDetail, CourseRead, CourseUpdate,
     MaterialRead, MyCourseRead, SubmissionRead, UnitRead,
@@ -242,3 +246,53 @@ def get_gradebook(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+
+
+class _RubricLevelBody(BaseModel):
+    title: str
+    description: str | None = None
+    points: int
+
+
+class _RubricCriteriaBody(BaseModel):
+    title: str
+    description: str | None = None
+    weight: int = 1
+    levels: list[_RubricLevelBody] = []
+
+
+class RubricBody(BaseModel):
+    title: str
+    description: str | None = None
+    criteria: list[_RubricCriteriaBody] = []
+
+
+@router.get("/assignments/{assignment_id}/rubric")
+def get_assignment_rubric(
+    assignment_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
+    if assignment is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
+    repo = RubricRepository(session)
+    rubric = repo.get_by_assignment(assignment.id)
+    if rubric is None:
+        return None
+    return repo.get_full(rubric.id)
+
+
+@router.put("/assignments/{assignment_id}/rubric")
+def upsert_assignment_rubric(
+    assignment_id: UUID,
+    body: RubricBody,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TEACHER")),
+):
+    assignment = AssignmentRepository(session).get_by_public_id(assignment_id)
+    if assignment is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Assignment not found")
+    repo = RubricRepository(session)
+    rubric = repo.upsert_full(body.model_dump(), assignment_id=assignment.id)
+    return repo.get_full(rubric.id)

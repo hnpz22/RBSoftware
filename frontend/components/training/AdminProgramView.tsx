@@ -33,6 +33,7 @@ import type {
   QuizQuestion,
 } from '@/services/training'
 import * as trainingService from '@/services/training'
+import { RubricEditor } from '@/components/rubric-editor'
 import * as academicService from '@/services/academic'
 import type { School, User } from '@/lib/types'
 
@@ -426,6 +427,15 @@ function ContentTab({ program, modules, reload }: Props) {
                                 <p className="mt-1 text-[10px] text-muted-foreground">{q.points} pts</p>
                               </div>
                             ))}
+                          </div>
+                        )}
+                        {selectedEvalId === ev.public_id && (
+                          <div className="ml-6 mt-2 border-l-2 border-primary/20 pl-4 pt-3">
+                            <h4 className="text-sm font-semibold mb-3">Rúbrica de evaluación</h4>
+                            <RubricEditor
+                              rubricEndpoint={`/training/evaluations/${ev.public_id}/rubric`}
+                              canEdit={true}
+                            />
                           </div>
                         )}
                       </div>

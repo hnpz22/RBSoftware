@@ -28,6 +28,7 @@ import type {
   TrainingSubmission,
 } from '@/services/training'
 import * as trainingService from '@/services/training'
+import { RubricEditor } from '@/components/rubric-editor'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -534,6 +535,13 @@ function EvaluationCard({ evaluation, onSubmissionUpdate }: { evaluation: Traini
           )}
           {passed && <CheckCircle2 size={24} className="text-green-500" />}
         </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border bg-card p-4">
+        <RubricEditor
+          rubricEndpoint={`/training/evaluations/${evaluation.public_id}/rubric`}
+          canEdit={false}
+        />
       </div>
 
       {showQuiz && (

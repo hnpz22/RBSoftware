@@ -10,6 +10,9 @@ from app.domains.academic.models.lms_submission import LmsSubmission
 from app.domains.academic.models.lms_unit import LmsUnit
 from app.domains.academic.models.school import School
 from app.domains.academic.models.pdf_annotation import PDFAnnotation
+from app.domains.academic.models.rubric import Rubric
+from app.domains.academic.models.rubric_criteria import RubricCriteria
+from app.domains.academic.models.rubric_level import RubricLevel
 from app.domains.academic.models.school_teacher import SchoolTeacher
 
 __all__ = [
@@ -24,4 +27,7 @@ __all__ = [
     "LmsMaterial",
     "LmsAssignment",
     "LmsSubmission",
+    "Rubric",
+    "RubricCriteria",
+    "RubricLevel",
 ]

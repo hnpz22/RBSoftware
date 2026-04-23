@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import * as academicService from '@/services/academic'
 import type { MySubmission, StudentAssignment } from '@/lib/types'
 import { FileViewerModal } from '@/components/file-viewer-modal'
+import { RubricEditor } from '@/components/rubric-editor'
 
 interface Props {
   assignment: StudentAssignment
@@ -133,6 +134,11 @@ export function SubmitAssignmentModal({
                 {assignment.description}
               </p>
             )}
+
+            <RubricEditor
+              rubricEndpoint={`/academic/assignments/${assignment.public_id}/rubric`}
+              canEdit={false}
+            />
 
             {/* Existing submission info */}
             {submission && (

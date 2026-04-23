@@ -8,6 +8,7 @@ import * as academicService from '@/services/academic'
 import type { SubmissionWithStudent } from '@/lib/types'
 import { GradeSubmissionModal } from './GradeSubmissionModal'
 import { FileViewerModal } from '@/components/file-viewer-modal'
+import { RubricEditor } from '@/components/rubric-editor'
 
 interface Props {
   assignmentId: string
@@ -70,6 +71,13 @@ export function AssignmentDetailModal({ assignmentId, onClose }: Props) {
             </button>
           </div>
           <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold mb-3">Rúbrica de evaluación</h4>
+              <RubricEditor
+                rubricEndpoint={`/academic/assignments/${assignmentId}/rubric`}
+                canEdit={true}
+              />
+            </div>
             {loading && (
               <p className="py-8 text-center text-muted-foreground">
                 Cargando…
