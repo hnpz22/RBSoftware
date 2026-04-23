@@ -61,7 +61,6 @@ export function Nav() {
         { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
         { href: '/orders',      label: 'Órdenes',     icon: ShoppingCart,  visible: () => isAdmin() || hasRole('COMERCIAL') },
         { href: '/catalog',     label: 'Catálogo',    icon: BookOpen,      visible: () => isAdmin() || hasRole('COMERCIAL') },
-        { href: '/inventory',   label: 'Inventario',  icon: Package,       visible: () => isAdmin() || hasRole('OPERATIVO') },
         { href: '/production',  label: 'Producción',  icon: Factory,       visible: () => isAdmin() || hasRole('OPERATIVO') },
         { href: '/fulfillment', label: 'Fulfillment', icon: PackageCheck,  visible: () => isAdmin() || hasRole('OPERATIVO') },
       ],
@@ -98,6 +97,7 @@ export function Nav() {
       title: 'Próximamente',
       items: [
         { href: '#', label: 'Administrativo', icon: GraduationCap, soon: true, disabled: true },
+        { href: '#', label: 'Inventario',     icon: Package,       soon: true, disabled: true },
         { href: '#', label: 'Integraciones',  icon: Plug,          soon: true, disabled: true },
       ],
     },
