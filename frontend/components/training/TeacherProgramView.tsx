@@ -128,6 +128,14 @@ export function TeacherProgramView({ program, modules }: Props) {
     ? !allLessons[currentIndex + 1] || allLessons[currentIndex + 1].moduleIndex !== currentLesson.moduleIndex
     : false
 
+  const matchedEvals =
+    currentModuleEvalData?.evaluations.filter((ev) => {
+      if (ev.after_lesson_public_id) {
+        return currentLesson?.public_id === ev.after_lesson_public_id
+      }
+      return isLastLessonOfModule
+    }) ?? []
+
   function isModuleUnlocked(moduleIndex: number): boolean {
     if (moduleIndex === 0) return true
     const prevModuleId = publishedModules[moduleIndex - 1]?.public_id
@@ -323,8 +331,8 @@ export function TeacherProgramView({ program, modules }: Props) {
                 <LessonVideoPlayer lesson={currentLesson} />
               )}
 
-              {/* Evaluation card at end of module */}
-              {isLastLessonOfModule && currentModuleEvalData && (
+              {/* Evaluations that match current lesson (linked) or end-of-module (unlinked) */}
+              {matchedEvals.length > 0 && (
                 <div className="mt-10 rounded-xl border-2 border-primary/20 bg-primary/5 p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -335,7 +343,7 @@ export function TeacherProgramView({ program, modules }: Props) {
                       <p className="text-sm text-muted-foreground">Completa la evaluación para avanzar</p>
                     </div>
                   </div>
-                  {currentModuleEvalData.evaluations.map((ev) => (
+                  {matchedEvals.map((ev) => (
                     <EvaluationCard key={ev.public_id} evaluation={ev} onSubmissionUpdate={(sub) => {
                       setSubmissionMap((prev) => new Map(prev).set(ev.public_id, sub))
                     }} />

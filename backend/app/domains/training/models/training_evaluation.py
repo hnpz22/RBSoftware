@@ -25,6 +25,14 @@ class TrainingEvaluation(SQLModel, table=True):
     max_score: int = Field(default=100, nullable=False)
     passing_score: int = Field(default=60, nullable=False)
     is_published: bool = Field(default=False, nullable=False)
+    after_lesson_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey("training_lessons.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False, server_default=func.now()),

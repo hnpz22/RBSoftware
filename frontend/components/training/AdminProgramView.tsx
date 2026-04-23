@@ -210,7 +210,7 @@ function ContentTab({ program, modules, reload }: Props) {
     <>
       {showCreateModule && <CreateModuleModal programId={program.public_id} orderIndex={modules.length} onClose={() => setShowCreateModule(false)} onCreated={() => { setShowCreateModule(false); reload() }} />}
       {showCreateLesson && selectedModuleId && <CreateLessonModal moduleId={selectedModuleId} onClose={() => setShowCreateLesson(false)} onCreated={() => { setShowCreateLesson(false); reloadModuleContent() }} />}
-      {showCreateEval && selectedModuleId && <CreateEvaluationModal moduleId={selectedModuleId} onClose={() => setShowCreateEval(false)} onCreated={() => { setShowCreateEval(false); reloadModuleContent() }} />}
+      {showCreateEval && selectedModuleId && <CreateEvaluationModal moduleId={selectedModuleId} lessons={lessons} onClose={() => setShowCreateEval(false)} onCreated={() => { setShowCreateEval(false); reloadModuleContent() }} />}
       {showCreateQuestion && selectedEvalId && <CreateQuestionModal evaluationId={selectedEvalId} onClose={() => setShowCreateQuestion(false)} onCreated={() => { setShowCreateQuestion(false); trainingService.listQuestions(selectedEvalId).then(setQuestions) }} />}
 
       {previewLesson && previewUrl && (
@@ -373,7 +373,15 @@ function ContentTab({ program, modules, reload }: Props) {
                             <ClipboardCheck size={16} className="text-muted-foreground" />
                             <div>
                               <p className="text-sm font-medium">{ev.title}</p>
-                              <p className="text-xs text-muted-foreground">{ev.type === 'QUIZ' ? 'Quiz' : 'Práctica'} · Aprueba con {ev.passing_score}/{ev.max_score}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {ev.type === 'QUIZ' ? 'Quiz' : 'Práctica'} · Aprueba con {ev.passing_score}/{ev.max_score}
+                                {ev.after_lesson_public_id && (
+                                  <>
+                                    {' · '}
+                                    Después de: {lessons.find((l) => l.public_id === ev.after_lesson_public_id)?.title ?? 'lección'}
+                                  </>
+                                )}
+                              </p>
                             </div>
                           </div>
                           <Badge variant={ev.is_published ? 'success' : 'secondary'} className="text-[10px]">{ev.is_published ? 'Publicada' : 'Borrador'}</Badge>
@@ -872,10 +880,11 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
   )
 }
 
-function CreateEvaluationModal({ moduleId, onClose, onCreated }: {
-  moduleId: string; onClose: () => void; onCreated: () => void
+function CreateEvaluationModal({ moduleId, lessons, onClose, onCreated }: {
+  moduleId: string; lessons: TrainingLesson[]; onClose: () => void; onCreated: () => void
 }) {
   const [form, setForm] = useState({ title: '', type: 'QUIZ', description: '', max_score: '100', passing_score: '60' })
+  const [afterLessonId, setAfterLessonId] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   return (
@@ -886,7 +895,20 @@ function CreateEvaluationModal({ moduleId, onClose, onCreated }: {
           <button onClick={onClose} className="rounded-md p-1 hover:bg-muted"><X size={16} /></button></div>
         <form onSubmit={async (e) => {
           e.preventDefault(); setError(null); setSaving(true)
-          try { await trainingService.createEvaluation(moduleId, { title: form.title.trim(), type: form.type, description: form.description.trim() || undefined, max_score: parseInt(form.max_score, 10), passing_score: parseInt(form.passing_score, 10) }); onCreated()
+          try {
+            const created = await trainingService.createEvaluation(moduleId, {
+              title: form.title.trim(),
+              type: form.type,
+              description: form.description.trim() || undefined,
+              max_score: parseInt(form.max_score, 10),
+              passing_score: parseInt(form.passing_score, 10),
+            })
+            if (afterLessonId) {
+              await api.patch(`/training/evaluations/${created.public_id}`, {
+                after_lesson_public_id: afterLessonId,
+              })
+            }
+            onCreated()
           } catch (err: any) { setError(err?.detail ?? 'Error') } finally { setSaving(false) }
         }} className="space-y-3 px-5 py-4">
           <div className="space-y-1"><label className="text-xs font-medium">Título *</label>
@@ -901,6 +923,24 @@ function CreateEvaluationModal({ moduleId, onClose, onCreated }: {
               <Input type="number" min={1} value={form.max_score} onChange={(e) => setForm({ ...form, max_score: e.target.value })} /></div>
             <div className="space-y-1"><label className="text-xs font-medium">Puntaje aprobatorio</label>
               <Input type="number" min={0} value={form.passing_score} onChange={(e) => setForm({ ...form, passing_score: e.target.value })} /></div></div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Mostrar después de lección</label>
+            <select
+              value={afterLessonId}
+              onChange={(e) => setAfterLessonId(e.target.value)}
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Al final del módulo (por defecto)</option>
+              {lessons.map((lesson) => (
+                <option key={lesson.public_id} value={lesson.public_id}>
+                  {lesson.title}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              La evaluación aparecerá cuando el docente complete esta lección
+            </p>
+          </div>
           {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancelar</Button>

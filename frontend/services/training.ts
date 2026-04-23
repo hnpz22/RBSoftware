@@ -34,6 +34,8 @@ export interface TrainingEvaluation {
   max_score: number
   passing_score: number
   is_published: boolean
+  after_lesson_id: number | null
+  after_lesson_public_id: string | null
   created_at: string
   updated_at: string
 }

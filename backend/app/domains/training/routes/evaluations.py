@@ -41,7 +41,7 @@ def list_evaluations(
     if module is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Módulo no encontrado")
     return [
-        EvaluationRead.model_validate(e)
+        _svc.build_evaluation_read(session, e)
         for e in EvaluationRepository(session).list_by_module(module.id)
     ]
 
@@ -65,7 +65,7 @@ def create_evaluation(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
-    return EvaluationRead.model_validate(evaluation)
+    return _svc.build_evaluation_read(session, evaluation)
 
 
 @router.patch("/evaluations/{evaluation_id}", response_model=EvaluationRead)
@@ -73,13 +73,19 @@ def update_evaluation(
     evaluation_id: UUID,
     data: EvaluationUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
 ):
-    evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
-    if evaluation is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Evaluación no encontrada")
-    updated = EvaluationRepository(session).update(evaluation, data)
-    return EvaluationRead.model_validate(updated)
+    try:
+        updated = _svc.update_evaluation(
+            session, evaluation_id, data, current_user.id
+        )
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    return _svc.build_evaluation_read(session, updated)
 
 
 @router.get("/evaluations/{evaluation_id}/questions")

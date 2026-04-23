@@ -25,8 +25,10 @@ from app.domains.training.repositories.program_repository import ProgramReposito
 from app.domains.training.repositories.quiz_question_repository import QuizQuestionRepository
 from app.domains.training.repositories.submission_repository import SubmissionRepository
 from app.domains.training.schemas.composite import TeacherProgramProgress
+from app.domains.training.models.training_evaluation import TrainingEvaluation
 from app.domains.training.schemas.training_evaluation import (
     EvaluationCreate,
+    EvaluationRead,
     EvaluationUpdate,
 )
 from app.domains.training.schemas.training_lesson import LessonCreate, LessonUpdate
@@ -195,6 +197,58 @@ class TrainingService:
         if module is None:
             raise LookupError("Módulo no encontrado")
         return EvaluationRepository(session).create(module.id, data)
+
+    def update_evaluation(
+        self,
+        session: Session,
+        evaluation_id: UUID,
+        data: EvaluationUpdate,
+        requesting_user_id: int,
+    ) -> TrainingEvaluation:
+        self._assert_admin_or_trainer(session, requesting_user_id)
+        evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
+        if evaluation is None:
+            raise LookupError("Evaluación no encontrada")
+
+        updates = data.model_dump(exclude_unset=True)
+
+        if "after_lesson_public_id" in updates:
+            public_id = updates.pop("after_lesson_public_id")
+            if public_id is None:
+                evaluation.after_lesson_id = None
+            else:
+                lesson = LessonRepository(session).get_by_public_id(UUID(public_id))
+                if lesson is None:
+                    raise LookupError("Lección no encontrada")
+                if lesson.module_id != evaluation.module_id:
+                    raise ValueError(
+                        "La lección no pertenece al mismo módulo de la evaluación"
+                    )
+                evaluation.after_lesson_id = lesson.id
+
+        for field_name, value in updates.items():
+            setattr(evaluation, field_name, value)
+
+        session.add(evaluation)
+        session.commit()
+        session.refresh(evaluation)
+        return evaluation
+
+    @staticmethod
+    def build_evaluation_read(
+        session: Session, evaluation: TrainingEvaluation
+    ) -> EvaluationRead:
+        after_lesson_public_id: str | None = None
+        if evaluation.after_lesson_id is not None:
+            lesson = LessonRepository(session).get(evaluation.after_lesson_id)
+            if lesson is not None:
+                after_lesson_public_id = str(lesson.public_id)
+        return EvaluationRead.model_validate(
+            {
+                **evaluation.model_dump(),
+                "after_lesson_public_id": after_lesson_public_id,
+            }
+        )
 
     # ── Quiz question management ─────────────────────────────────────────────
 

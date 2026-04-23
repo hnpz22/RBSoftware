@@ -25,6 +25,8 @@ class EvaluationRead(SQLModel):
     max_score: int
     passing_score: int
     is_published: bool
+    after_lesson_id: int | None = None
+    after_lesson_public_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -36,3 +38,4 @@ class EvaluationUpdate(SQLModel):
     max_score: int | None = None
     passing_score: int | None = None
     is_published: bool | None = None
+    after_lesson_public_id: str | None = None
