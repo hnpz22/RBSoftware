@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/lib/store'
 import { api } from '@/lib/api'
+import { toast } from '@/components/ui/use-toast'
 import type { TrainingProgram, TrainingEnrollmentProgress } from '@/lib/types'
 import type {
   TrainingModule,
@@ -49,8 +50,19 @@ type ProgramTab = 'content' | 'enrolled' | 'gradebook' | 'practicals'
 
 export function AdminProgramView({ program, modules, reload }: Props) {
   const router = useRouter()
-  const { isAdmin } = useAuthStore()
+  const { isAdmin, hasRole } = useAuthStore()
   const [programTab, setProgramTab] = useState<ProgramTab>('content')
+  const [templateUrl, setTemplateUrl] = useState<string | null>(null)
+  const [uploadingTemplate, setUploadingTemplate] = useState(false)
+
+  useEffect(() => {
+    api
+      .get<{ template_url: string | null }>(
+        `/training/programs/${program.public_id}/certificate-template`,
+      )
+      .then((data) => setTemplateUrl(data.template_url))
+      .catch(() => {})
+  }, [program.public_id])
 
   const programTabs: { key: ProgramTab; label: string }[] = [
     { key: 'content', label: 'Contenido' },
@@ -101,6 +113,70 @@ export function AdminProgramView({ program, modules, reload }: Props) {
           <p className="text-xs text-muted-foreground">{program.description}</p>
         )}
       </div>
+
+      {(isAdmin() || hasRole('SUPER_TRAINER')) && (
+        <div className="flex items-center gap-3 p-4 rounded-xl border bg-card mx-4 mt-3">
+          <div className="flex-1">
+            <p className="text-sm font-medium">Plantilla del certificado</p>
+            <p className="text-xs text-muted-foreground">
+              {templateUrl
+                ? 'Plantilla cargada — se usará como fondo del certificado'
+                : 'Sin plantilla — se usará el badge predeterminado'}
+            </p>
+          </div>
+
+          {templateUrl && (
+            <img
+              src={templateUrl}
+              alt="Plantilla"
+              className="h-16 w-24 object-cover rounded-lg border"
+            />
+          )}
+
+          <label
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+              uploadingTemplate
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-primary text-white hover:bg-primary/90'
+            }`}
+          >
+            {uploadingTemplate
+              ? 'Subiendo...'
+              : templateUrl
+                ? 'Cambiar plantilla'
+                : 'Subir plantilla'}
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              className="hidden"
+              disabled={uploadingTemplate}
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setUploadingTemplate(true)
+                try {
+                  const formData = new FormData()
+                  formData.append('file', file)
+                  const result = await api.postForm<{ template_url: string }>(
+                    `/training/programs/${program.public_id}/certificate-template`,
+                    formData,
+                  )
+                  setTemplateUrl(result.template_url)
+                  toast({ title: 'Plantilla actualizada', variant: 'success' })
+                } catch {
+                  toast({
+                    title: 'Error al subir plantilla',
+                    variant: 'destructive',
+                  })
+                } finally {
+                  setUploadingTemplate(false)
+                  e.target.value = ''
+                }
+              }}
+            />
+          </label>
+        </div>
+      )}
 
       {/* Program-level tabs */}
       <div className="flex shrink-0 border-b px-4">

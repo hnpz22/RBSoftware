@@ -20,6 +20,9 @@ class TrainingProgram(SQLModel, table=True):
     duration_hours: int | None = Field(default=None, nullable=True)
     is_active: bool = Field(default=True, nullable=False)
     is_published: bool = Field(default=False, nullable=False)
+    certificate_template_key: str | None = Field(
+        default=None, sa_column=Column(String(500), nullable=True)
+    )
     created_by: int | None = Field(
         default=None,
         sa_column=Column(Integer, ForeignKey("users.id"), nullable=True),

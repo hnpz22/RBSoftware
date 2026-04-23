@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 
 interface CertificateRaw {
   public_id: string
+  program_public_id: string
   certificate_code: string
   badge_key: string | null
   issued_at: string
@@ -27,52 +28,97 @@ interface CertificateEnriched extends CertificateRaw {
   teacher_name: string
 }
 
-function generateBadge(certificate: CertificateEnriched) {
+async function generateBadge(cert: CertificateEnriched) {
   const canvas = document.createElement('canvas')
-  canvas.width = 400
-  canvas.height = 400
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
+  canvas.width = 800
+  canvas.height = 600
+  const ctx = canvas.getContext('2d')!
 
-  // Navy blue background circle
-  ctx.fillStyle = '#1A237E'
-  ctx.beginPath()
-  ctx.arc(200, 200, 190, 0, Math.PI * 2)
-  ctx.fill()
+  try {
+    const templateData = await api.get<{ template_url: string | null }>(
+      `/training/programs/${cert.program_public_id}/certificate-template`,
+    )
 
-  // Orange inner circle
-  ctx.fillStyle = '#FF6F00'
-  ctx.beginPath()
-  ctx.arc(200, 200, 160, 0, Math.PI * 2)
-  ctx.fill()
+    if (templateData.template_url) {
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-  // RS logo text
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 60px Arial'
-  ctx.textAlign = 'center'
-  ctx.fillText('RS', 200, 180)
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  // Teacher name
-  ctx.font = 'bold 20px Arial'
-  ctx.fillText(certificate.teacher_name, 200, 230)
+          ctx.fillStyle = '#FFFFFF'
+          ctx.font = 'bold 42px Arial, sans-serif'
+          ctx.textAlign = 'center'
+          ctx.shadowColor = 'rgba(0,0,0,0.5)'
+          ctx.shadowBlur = 8
+          ctx.fillText(cert.teacher_name, canvas.width / 2, 280)
 
-  // Program name (truncated)
-  ctx.font = '14px Arial'
-  ctx.fillStyle = '#FFD600'
-  const programName =
-    certificate.program_name.length > 30
-      ? certificate.program_name.slice(0, 30) + '...'
-      : certificate.program_name
-  ctx.fillText(programName, 200, 260)
+          ctx.font = '24px Arial, sans-serif'
+          ctx.fillStyle = '#FFD700'
+          const programName =
+            cert.program_name.length > 45
+              ? cert.program_name.slice(0, 45) + '...'
+              : cert.program_name
+          ctx.fillText(programName, canvas.width / 2, 330)
 
-  // Certificate code
-  ctx.font = '12px Arial'
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fillText(certificate.certificate_code, 200, 300)
+          ctx.font = '16px Arial, sans-serif'
+          ctx.fillStyle = 'rgba(255,255,255,0.8)'
+          ctx.fillText(cert.certificate_code, canvas.width / 2, 380)
 
-  // Download
+          ctx.shadowBlur = 0
+          resolve()
+        }
+        img.onerror = reject
+        img.src = templateData.template_url!
+      })
+    } else {
+      canvas.width = 400
+      canvas.height = 400
+
+      ctx.fillStyle = '#1A237E'
+      ctx.beginPath()
+      ctx.arc(200, 200, 190, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = '#FF6F00'
+      ctx.beginPath()
+      ctx.arc(200, 200, 160, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = 'bold 60px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('RS', 200, 180)
+
+      ctx.font = 'bold 20px Arial'
+      ctx.fillText(cert.teacher_name, 200, 230)
+
+      ctx.font = '14px Arial'
+      ctx.fillStyle = '#FFD600'
+      const pName =
+        cert.program_name.length > 30
+          ? cert.program_name.slice(0, 30) + '...'
+          : cert.program_name
+      ctx.fillText(pName, 200, 260)
+
+      ctx.font = '12px Arial'
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillText(cert.certificate_code, 200, 300)
+    }
+  } catch {
+    ctx.fillStyle = '#1A237E'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = 'bold 24px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText(cert.teacher_name, canvas.width / 2, canvas.height / 2)
+  }
+
   const link = document.createElement('a')
-  link.download = `certificado-${certificate.certificate_code}.png`
+  link.download = `certificado-${cert.certificate_code}.png`
   link.href = canvas.toDataURL('image/png')
   link.click()
 }

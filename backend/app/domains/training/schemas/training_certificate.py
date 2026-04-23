@@ -11,6 +11,7 @@ class CertificateRead(SQLModel):
     model_config = ConfigDict(from_attributes=True)
 
     public_id: UUID
+    program_public_id: UUID
     certificate_code: str
     badge_key: str | None
     issued_at: datetime

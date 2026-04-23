@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlmodel import Session
 
 from app.core.database import get_session
 from app.core.permissions import require_roles
+from app.core.storage import storage_service
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
+from app.domains.training.models.training_certificate import TrainingCertificate
 from app.domains.training.repositories.certificate_repository import CertificateRepository
 from app.domains.training.repositories.enrollment_repository import EnrollmentRepository
 from app.domains.training.repositories.program_repository import ProgramRepository
@@ -18,6 +20,14 @@ from app.domains.training.services import TrainingService
 
 router = APIRouter(prefix="/training", tags=["training – certificates"])
 _svc = TrainingService()
+
+
+def _build_certificate_read(session: Session, cert: TrainingCertificate) -> CertificateRead:
+    program = ProgramRepository(session).get(cert.program_id)
+    return CertificateRead.model_validate(
+        cert,
+        update={"program_public_id": program.public_id if program else None},
+    )
 
 
 @router.get("/enrollments/{enrollment_id}/check")
@@ -52,7 +62,7 @@ def issue_certificate(
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
-    return CertificateRead.model_validate(certificate)
+    return _build_certificate_read(session, certificate)
 
 
 @router.get("/certificates/{code}/verify")
@@ -88,5 +98,54 @@ def get_my_certificates(
     for enrollment in enrollments:
         cert = cert_repo.get_by_enrollment(enrollment.id)
         if cert is not None:
-            result.append(CertificateRead.model_validate(cert))
+            result.append(_build_certificate_read(session, cert))
     return result
+
+
+@router.post("/programs/{program_id}/certificate-template")
+def upload_certificate_template(
+    program_id: UUID,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "SUPER_TRAINER")),
+):
+    if file.content_type not in ("image/png", "image/jpeg"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Solo se permiten PNG o JPG",
+        )
+    program = ProgramRepository(session).get_by_public_id(program_id)
+    if program is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Programa no encontrado")
+
+    ext = "png" if file.content_type == "image/png" else "jpg"
+    key = f"training/certificates/templates/{program.public_id}.{ext}"
+    storage_service.upload_file(file.file.read(), key, file.content_type)
+
+    program.certificate_template_key = key
+    session.add(program)
+    session.commit()
+
+    return {
+        "template_url": storage_service.generate_presigned_url(
+            key, expires_seconds=3600
+        )
+    }
+
+
+@router.get("/programs/{program_id}/certificate-template")
+def get_certificate_template(
+    program_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    program = ProgramRepository(session).get_by_public_id(program_id)
+    if program is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Programa no encontrado")
+    if not program.certificate_template_key:
+        return {"template_url": None}
+    return {
+        "template_url": storage_service.generate_presigned_url(
+            program.certificate_template_key, expires_seconds=3600
+        )
+    }
