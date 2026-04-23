@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Download,
+  Eye,
+  EyeOff,
   FileText,
   Plus,
   Trash2,
@@ -144,6 +146,11 @@ function ContentTab({ program, modules, reload }: Props) {
     trainingService.listEvaluations(selectedModuleId).then(setEvaluations).catch(() => {})
   }
 
+  async function toggleLesson(lessonId: string, publish: boolean) {
+    await api.post(`/training/lessons/${lessonId}/publish`, { publish })
+    reloadModuleContent()
+  }
+
   return (
     <>
       {showCreateModule && <CreateModuleModal programId={program.public_id} orderIndex={modules.length} onClose={() => setShowCreateModule(false)} onCreated={() => { setShowCreateModule(false); reload() }} />}
@@ -209,7 +216,23 @@ function ContentTab({ program, modules, reload }: Props) {
                             <p className="text-xs text-muted-foreground">{l.type}{l.duration_minutes ? ` · ${l.duration_minutes} min` : ''}</p>
                           </div>
                         </div>
-                        <Badge variant={l.is_published ? 'success' : 'secondary'} className="text-[10px]">{l.is_published ? 'Publicada' : 'Borrador'}</Badge>
+                        {l.is_published ? (
+                          <button
+                            onClick={() => toggleLesson(l.public_id, false)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700 transition-colors"
+                          >
+                            <Eye size={10} />
+                            Publicada
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => toggleLesson(l.public_id, true)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700 transition-colors"
+                          >
+                            <EyeOff size={10} />
+                            Borrador
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>

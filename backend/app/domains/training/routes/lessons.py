@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.database import get_session
@@ -94,6 +95,26 @@ def update_lesson(
     if lesson is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Lección no encontrada")
     updated = LessonRepository(session).update(lesson, data)
+    return LessonRead.model_validate(updated)
+
+
+class PublishBody(BaseModel):
+    publish: bool
+
+
+@router.post("/lessons/{lesson_id}/publish", response_model=LessonRead)
+def publish_lesson(
+    lesson_id: UUID,
+    body: PublishBody,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+):
+    lesson = LessonRepository(session).get_by_public_id(lesson_id)
+    if lesson is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Lección no encontrada")
+    updated = LessonRepository(session).update(
+        lesson, LessonUpdate(is_published=body.publish)
+    )
     return LessonRead.model_validate(updated)
 
 
