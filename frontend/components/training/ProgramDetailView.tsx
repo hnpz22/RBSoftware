@@ -56,7 +56,7 @@ export function ProgramDetailView({ programId }: Props) {
     return <div className="flex items-center justify-center py-20 text-muted-foreground">Programa no encontrado</div>
   }
 
-  const canManage = isAdmin() || hasRole('TRAINER')
+  const canManage = isAdmin() || hasRole('TRAINER') || hasRole('SUPER_TRAINER')
 
   if (canManage) {
     return <AdminProgramView program={program} modules={modules} reload={load} />
