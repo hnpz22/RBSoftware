@@ -144,7 +144,7 @@ export function PDFHighlighterViewer({ url, materialId, fileName }: Props) {
 
       {/* Visor PDF */}
       <div className="flex-1 relative">
-        <div className="absolute inset-0 overflow-auto">
+        <div className="pdf-highlighter-wrapper absolute inset-0 overflow-auto">
         <PdfLoader
           key={url}
           url={url}

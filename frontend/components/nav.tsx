@@ -11,17 +11,14 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  Factory,
   GraduationCap,
   Layers,
   LayoutDashboard,
   LogOut,
   Moon,
   Package,
-  PackageCheck,
   Plug,
   Shield,
-  ShoppingCart,
   Sun,
   Users2,
 } from 'lucide-react'
@@ -59,10 +56,6 @@ export function Nav() {
       title: 'Operaciones',
       items: [
         { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
-        { href: '/orders',      label: 'Órdenes',     icon: ShoppingCart,  visible: () => isAdmin() || hasRole('COMERCIAL') },
-        { href: '/catalog',     label: 'Catálogo',    icon: BookOpen,      visible: () => isAdmin() || hasRole('COMERCIAL') },
-        { href: '/production',  label: 'Producción',  icon: Factory,       visible: () => isAdmin() || hasRole('OPERATIVO') },
-        { href: '/fulfillment', label: 'Fulfillment', icon: PackageCheck,  visible: () => isAdmin() || hasRole('OPERATIVO') },
       ],
     },
     {
