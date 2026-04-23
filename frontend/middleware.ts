@@ -15,8 +15,8 @@ const ROUTE_ROLES: [string, string[]][] = [
   ['/production', ['ADMIN', 'OPERATIVO']],
   ['/fulfillment', ['ADMIN', 'OPERATIVO']],
   ['/reports', ['ADMIN']],
-  ['/training/grading', ['ADMIN', 'TRAINER']],
-  ['/training/programs', ['ADMIN', 'TRAINER', 'TEACHER']],
+  ['/training/grading', ['ADMIN', 'TRAINER', 'SUPER_TRAINER']],
+  ['/training/programs', ['ADMIN', 'TRAINER', 'SUPER_TRAINER', 'TEACHER']],
   ['/training/my-programs', ['ADMIN', 'TEACHER']],
   ['/training/certificates', ['ADMIN', 'TEACHER']],
 ]

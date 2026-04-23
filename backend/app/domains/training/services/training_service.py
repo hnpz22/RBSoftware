@@ -60,7 +60,7 @@ class TrainingService:
     @staticmethod
     def _is_admin_or_trainer(session: Session, user_id: int) -> bool:
         roles = UserRoleRepository(session).get_role_names_for_user(user_id)
-        return "ADMIN" in roles or "TRAINER" in roles
+        return any(r in roles for r in ["ADMIN", "TRAINER", "SUPER_TRAINER"])
 
     def _assert_admin_or_trainer(self, session: Session, user_id: int) -> None:
         if not self._is_admin_or_trainer(session, user_id):
@@ -69,6 +69,15 @@ class TrainingService:
     def _assert_admin(self, session: Session, user_id: int) -> None:
         if not self._is_admin(session, user_id):
             raise PermissionError("Se requiere rol ADMIN")
+
+    @staticmethod
+    def _is_admin_or_super_trainer(session: Session, user_id: int) -> bool:
+        roles = UserRoleRepository(session).get_role_names_for_user(user_id)
+        return "ADMIN" in roles or "SUPER_TRAINER" in roles
+
+    def _assert_admin_or_super_trainer(self, session: Session, user_id: int) -> None:
+        if not self._is_admin_or_super_trainer(session, user_id):
+            raise PermissionError("Se requiere rol ADMIN o SUPER_TRAINER")
 
     # ── Program management ───────────────────────────────────────────────────
 
@@ -562,7 +571,7 @@ class TrainingService:
         enrollment_id: UUID,
         requesting_user_id: int,
     ):
-        self._assert_admin(session, requesting_user_id)
+        self._assert_admin_or_super_trainer(session, requesting_user_id)
 
         enrollment = EnrollmentRepository(session).get_by_public_id(enrollment_id)
         if enrollment is None:

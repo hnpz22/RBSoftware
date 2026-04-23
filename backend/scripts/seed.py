@@ -39,6 +39,13 @@ USERS = [
         last_name="RobotSchool",
         position="Administrador",
     ),
+    dict(
+        email="supertrainer@robotschool.com",
+        password="SuperTrainer1234!",
+        first_name="Ana",
+        last_name="Supervisora",
+        position="Coordinadora de Capacitación",
+    ),
 ]
 
 
@@ -86,6 +93,13 @@ ROLES = [
     RoleCreate(name="OPERATIVO", description="Personal de producción y bodega"),
     RoleCreate(name="COMERCIAL", description="Personal de ventas y órdenes"),
     RoleCreate(name="TRAINER", description="Instructor de capacitación docente de RobotSchool"),
+    RoleCreate(
+        name="SUPER_TRAINER",
+        description=(
+            "Instructor jefe de RobotSchool. Puede ver y gestionar todos los "
+            "programas y asignar TRAINERs."
+        ),
+    ),
 ]
 
 
@@ -109,6 +123,7 @@ USER_ROLE_ASSIGNMENTS = [
     ("estudiante1@sanpedro.edu.co", "STUDENT"),
     ("estudiante2@sanpedro.edu.co", "STUDENT"),
     ("trainer@robotschool.com", "TRAINER"),
+    ("supertrainer@robotschool.com", "SUPER_TRAINER"),
 ]
 
 

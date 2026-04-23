@@ -32,7 +32,7 @@ def list_programs(
     current_user: User = Depends(get_current_user),
 ):
     role_names = UserRoleRepository(session).get_role_names_for_user(current_user.id)
-    if "ADMIN" in role_names:
+    if "ADMIN" in role_names or "SUPER_TRAINER" in role_names:
         programs = ProgramRepository(session).list_active()
     elif "TRAINER" in role_names:
         programs = ProgramRepository(session).list_by_creator(current_user.id)
@@ -55,7 +55,7 @@ def list_programs(
 def create_program(
     data: ProgramCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         program = _svc.create_program(session, data, current_user.id)
@@ -81,7 +81,7 @@ def update_program(
     program_id: UUID,
     data: ProgramUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         program = _svc.update_program(session, program_id, data, current_user.id)
@@ -101,7 +101,7 @@ def publish_program(
     program_id: UUID,
     body: PublishRequest = PublishRequest(),
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         _svc.publish_program(session, program_id, current_user.id, publish=body.publish)
@@ -117,7 +117,7 @@ def publish_program(
 def get_gradebook(
     program_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         return _svc.get_training_gradebook(session, program_id, current_user.id)
@@ -131,7 +131,7 @@ def get_gradebook(
 def get_program_progress(
     program_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     program = ProgramRepository(session).get_by_public_id(program_id)
     if program is None:

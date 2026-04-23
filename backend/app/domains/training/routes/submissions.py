@@ -97,7 +97,7 @@ async def submit_practical(
 def list_submissions(
     evaluation_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
     if evaluation is None:
@@ -132,7 +132,7 @@ def get_my_submission(
 def view_submission(
     submission_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     submission = SubmissionRepository(session).get_by_public_id(submission_id)
     if submission is None:
@@ -156,7 +156,7 @@ def grade_submission(
     submission_id: UUID,
     body: GradeBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         _svc.grade_practical(

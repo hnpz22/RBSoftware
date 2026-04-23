@@ -24,7 +24,7 @@ _svc = TrainingService()
 def check_completion(
     enrollment_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         return _svc.check_completion(session, enrollment_id)
@@ -40,7 +40,7 @@ def check_completion(
 def issue_certificate(
     enrollment_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN")),
+    current_user: User = Depends(require_roles("ADMIN", "SUPER_TRAINER")),
 ):
     try:
         certificate = _svc.issue_certificate(

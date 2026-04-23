@@ -46,7 +46,7 @@ def create_module(
     program_id: UUID,
     data: ModuleCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         module = _svc.create_module(session, program_id, data, current_user.id)
@@ -62,7 +62,7 @@ def update_module(
     module_id: UUID,
     data: ModuleUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     module = ModuleRepository(session).get_by_public_id(module_id)
     if module is None:
@@ -80,7 +80,7 @@ def update_module(
 def publish_module(
     module_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     module = ModuleRepository(session).get_by_public_id(module_id)
     if module is None:

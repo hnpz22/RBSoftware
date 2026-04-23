@@ -56,7 +56,7 @@ def create_evaluation(
     module_id: UUID,
     data: EvaluationCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         evaluation = _svc.create_evaluation(
@@ -74,7 +74,7 @@ def update_evaluation(
     evaluation_id: UUID,
     data: EvaluationUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         updated = _svc.update_evaluation(
@@ -101,7 +101,7 @@ def publish_evaluation(
     evaluation_id: UUID,
     body: PublishEvalRequest = PublishEvalRequest(),
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     evaluation = EvaluationRepository(session).get_by_public_id(evaluation_id)
     if evaluation is None:
@@ -143,7 +143,7 @@ def create_question(
     evaluation_id: UUID,
     data: QuizQuestionCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     try:
         question = _svc.create_quiz_question(
@@ -164,7 +164,7 @@ def create_question(
 def delete_question(
     question_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     question = QuizQuestionRepository(session).get_by_public_id(question_id)
     if question is None:

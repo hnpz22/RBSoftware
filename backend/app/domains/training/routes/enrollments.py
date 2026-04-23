@@ -30,7 +30,7 @@ class EnrollBody(BaseModel):
 def list_enrollments(
     program_id: UUID,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     program = ProgramRepository(session).get_by_public_id(program_id)
     if program is None:
@@ -50,7 +50,7 @@ def enroll_teacher(
     program_id: UUID,
     body: EnrollBody,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     user = UserRepository(session).get_by_public_id(body.user_id)
     if user is None:

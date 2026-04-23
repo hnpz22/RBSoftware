@@ -53,7 +53,7 @@ async def create_lesson(
     order_index: int = Form(default=0),
     file: UploadFile | None = File(default=None),
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TRAINER")),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     file_bytes = None
     content_type = None
@@ -89,7 +89,7 @@ def update_lesson(
     lesson_id: UUID,
     data: LessonUpdate,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     lesson = LessonRepository(session).get_by_public_id(lesson_id)
     if lesson is None:
@@ -110,7 +110,7 @@ def reorder_lessons(
     module_id: UUID,
     body: ReorderBody,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     module = ModuleRepository(session).get_by_public_id(module_id)
     if module is None:
@@ -142,7 +142,7 @@ def publish_lesson(
     lesson_id: UUID,
     body: PublishBody,
     session: Session = Depends(get_session),
-    _: User = Depends(require_roles("ADMIN", "TRAINER")),
+    _: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
 ):
     lesson = LessonRepository(session).get_by_public_id(lesson_id)
     if lesson is None:
