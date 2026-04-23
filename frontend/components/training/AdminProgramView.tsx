@@ -685,6 +685,9 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
 }) {
   const [form, setForm] = useState({ title: '', type: 'TEXT', content: '', duration_minutes: '' })
   const [file, setFile] = useState<File | null>(null)
+  const [videoMode, setVideoMode] = useState<'url' | 'file'>('url')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoFile, setVideoFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   return (
@@ -695,10 +698,22 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
           <button onClick={onClose} className="rounded-md p-1 hover:bg-muted"><X size={16} /></button></div>
         <form onSubmit={async (e) => {
           e.preventDefault(); setError(null); setSaving(true)
-          try { const fd = new FormData(); fd.append('title', form.title.trim()); fd.append('type', form.type)
-            if (form.content.trim()) fd.append('content', form.content.trim())
+          try {
+            const fd = new FormData()
+            fd.append('title', form.title.trim())
+            fd.append('type', form.type)
             if (form.duration_minutes) fd.append('duration_minutes', form.duration_minutes)
-            if (file) fd.append('file', file)
+            if (form.type === 'TEXT' && form.content.trim()) {
+              fd.append('content', form.content.trim())
+            } else if (form.type === 'PDF' && file) {
+              fd.append('file', file)
+            } else if (form.type === 'VIDEO') {
+              if (videoMode === 'url' && videoUrl.trim()) {
+                fd.append('content', videoUrl.trim())
+              } else if (videoMode === 'file' && videoFile) {
+                fd.append('file', videoFile)
+              }
+            }
             await trainingService.createLesson(moduleId, fd); onCreated()
           } catch (err: any) { setError(err?.detail ?? 'Error') } finally { setSaving(false) }
         }} className="space-y-3 px-5 py-4">
@@ -712,8 +727,61 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
               <Input type="number" min={1} placeholder="30" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} /></div></div>
           {form.type === 'TEXT' && <div className="space-y-1"><label className="text-xs font-medium">Contenido</label>
             <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} /></div>}
-          {(form.type === 'PDF' || form.type === 'VIDEO') && <div className="space-y-1"><label className="text-xs font-medium">Archivo</label>
-            <input type="file" accept={form.type === 'PDF' ? '.pdf' : 'video/*'} className="block w-full text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div>}
+          {form.type === 'PDF' && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Archivo</label>
+              <input type="file" accept=".pdf" className="block w-full text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </div>
+          )}
+          {form.type === 'VIDEO' && (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVideoMode('url')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    videoMode === 'url'
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  🔗 Link de YouTube
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoMode('file')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    videoMode === 'file'
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  📁 Subir archivo
+                </button>
+              </div>
+              {videoMode === 'url' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">URL del video</label>
+                  <input
+                    type="url"
+                    placeholder="https://youtube.com/watch?v=..."
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">Soporta YouTube, Vimeo y otros</p>
+                </div>
+              )}
+              {videoMode === 'file' && (
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm border rounded-lg p-2 bg-background"
+                />
+              )}
+            </div>
+          )}
           {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
