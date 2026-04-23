@@ -21,7 +21,12 @@ type CourseTab = 'content' | 'students' | 'gradebook'
 
 export function TeacherCourseView({ course, units, reload, canEditContent }: Props) {
   const router = useRouter()
-  const [courseTab, setCourseTab] = useState<CourseTab>('content')
+  const [courseTab, setCourseTab] = useState<CourseTab>(() => {
+    if (typeof window === 'undefined') return 'content'
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t === 'students' || t === 'gradebook' || t === 'content') return t
+    return 'content'
+  })
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(
     units[0]?.public_id ?? null,
   )

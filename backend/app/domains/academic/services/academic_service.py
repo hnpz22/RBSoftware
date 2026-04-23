@@ -983,9 +983,7 @@ class AcademicService:
         if course is None:
             raise LookupError("Curso no encontrado")
 
-        is_admin = self._is_admin(session, requesting_user_id)
-        if not is_admin and course.teacher_id != requesting_user_id:
-            raise PermissionError("Solo el docente del curso puede ver la planilla")
+        self._assert_admin_or_director_or_teacher(session, course, requesting_user_id)
 
         assignments = AssignmentRepository(session).list_by_course(course.id)
         students = CourseStudentRepository(session).get_students(course.id)

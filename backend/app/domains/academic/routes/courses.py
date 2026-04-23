@@ -231,7 +231,7 @@ def get_course_content(
 def get_gradebook(
     course_id: UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_roles("ADMIN", "TEACHER")),
+    current_user: User = Depends(require_roles("ADMIN", "TEACHER", "DIRECTOR")),
 ):
     course = CourseRepository(session).get_by_public_id(course_id)
     if course is None:

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BarChart2, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGradeDetail } from '@/hooks/useGradeDetail'
 import type { GradeStudent } from '@/hooks/useGradeDetail'
@@ -145,13 +145,14 @@ export function GradeDetailView({ gradeId }: Props) {
                     Estudiantes
                   </th>
                   <th className="px-4 py-3 text-left font-medium">Activo</th>
+                  <th className="px-4 py-3 text-left font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {courseRows.length === 0 && (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       Sin cursos
@@ -185,6 +186,20 @@ export function GradeDetailView({ gradeId }: Props) {
                       >
                         {c.is_active ? 'Sí' : 'No'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(
+                            `/academic/courses/${c.public_id}?tab=gradebook`,
+                          )
+                        }}
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <BarChart2 size={12} />
+                        Planilla
+                      </button>
                     </td>
                   </tr>
                 ))}
