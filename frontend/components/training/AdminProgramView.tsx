@@ -16,6 +16,7 @@ import {
   FileText,
   Plus,
   Trash2,
+  Upload,
   Video,
   X,
 } from 'lucide-react'
@@ -44,7 +45,7 @@ interface Props {
   reload: () => void
 }
 
-type ProgramTab = 'content' | 'enrolled' | 'gradebook' | 'practicals'
+type ProgramTab = 'content' | 'enrolled' | 'gradebook' | 'practicals' | 'templates'
 
 // ── Main component ──────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export function AdminProgramView({ program, modules, reload }: Props) {
     { key: 'enrolled', label: 'Inscritos' },
     { key: 'gradebook', label: 'Planilla' },
     { key: 'practicals', label: 'Entregas Prácticas' },
+    { key: 'templates', label: 'Plantillas' },
   ]
 
   return (
@@ -207,6 +209,9 @@ export function AdminProgramView({ program, modules, reload }: Props) {
       )}
       {programTab === 'practicals' && (
         <PracticalsTab program={program} modules={modules} />
+      )}
+      {programTab === 'templates' && (
+        <TemplatesTab program={program} />
       )}
     </div>
   )
@@ -986,7 +991,7 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
 function CreateEvaluationModal({ moduleId, lessons, onClose, onCreated }: {
   moduleId: string; lessons: TrainingLesson[]; onClose: () => void; onCreated: () => void
 }) {
-  const [form, setForm] = useState({ title: '', type: 'QUIZ', description: '', max_score: '100', passing_score: '60' })
+  const [form, setForm] = useState({ title: '', type: 'QUIZ', description: '', max_score: '100', passing_score: '60', max_attempts: '3' })
   const [afterLessonId, setAfterLessonId] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1005,6 +1010,7 @@ function CreateEvaluationModal({ moduleId, lessons, onClose, onCreated }: {
               description: form.description.trim() || undefined,
               max_score: parseInt(form.max_score, 10),
               passing_score: parseInt(form.passing_score, 10),
+              max_attempts: parseInt(form.max_attempts, 10),
             })
             if (afterLessonId) {
               await api.patch(`/training/evaluations/${created.public_id}`, {
@@ -1026,6 +1032,11 @@ function CreateEvaluationModal({ moduleId, lessons, onClose, onCreated }: {
               <Input type="number" min={1} value={form.max_score} onChange={(e) => setForm({ ...form, max_score: e.target.value })} /></div>
             <div className="space-y-1"><label className="text-xs font-medium">Puntaje aprobatorio</label>
               <Input type="number" min={0} value={form.passing_score} onChange={(e) => setForm({ ...form, passing_score: e.target.value })} /></div></div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Intentos máximos</label>
+            <Input type="number" min={1} value={form.max_attempts} onChange={(e) => setForm({ ...form, max_attempts: e.target.value })} />
+            <p className="text-[10px] text-muted-foreground">Cantidad de veces que el docente puede intentar. Tras agotarlos, podrá avanzar sin aprobar.</p>
+          </div>
           <div className="space-y-1">
             <label className="text-xs font-medium">Mostrar después de lección</label>
             <select
@@ -1223,4 +1234,188 @@ function EnrollTeacherModal({ programId, enrolledIds, onClose, onEnrolled }: {
       </div>
     </div>
   )
+}
+
+// ── Templates Tab ───────────────────────────────────────────────────────────
+
+interface Template {
+  public_id: string
+  title: string
+  description: string | null
+  file_name: string
+  file_size: number | null
+  uploaded_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+function TemplatesTab({ program }: { program: TrainingProgram }) {
+  const { isAdmin, hasRole } = useAuthStore()
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+
+  const canManage = isAdmin() || hasRole('TRAINER') || hasRole('SUPER_TRAINER')
+
+  useEffect(() => {
+    setLoadingTemplates(true)
+    api
+      .get<Template[]>(`/training/programs/${program.public_id}/templates`)
+      .then(setTemplates)
+      .finally(() => setLoadingTemplates(false))
+  }, [program.public_id])
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold">Plantillas del programa</h3>
+            <p className="text-sm text-muted-foreground">
+              Documentos que los docentes pueden descargar para sus entregas
+            </p>
+          </div>
+
+          {canManage && (
+            <label
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer bg-primary text-white hover:bg-primary/90 transition-colors ${
+                uploadingDoc ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <Upload size={16} />
+              {uploadingDoc ? 'Subiendo...' : 'Subir plantilla'}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                className="hidden"
+                disabled={uploadingDoc}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const title = file.name.replace(/\.[^/.]+$/, '')
+                  setUploadingDoc(true)
+                  try {
+                    const formData = new FormData()
+                    formData.append('file', file)
+                    formData.append('title', title)
+                    await api.postForm(
+                      `/training/programs/${program.public_id}/templates`,
+                      formData,
+                    )
+                    const updated = await api.get<Template[]>(
+                      `/training/programs/${program.public_id}/templates`,
+                    )
+                    setTemplates(updated)
+                    toast({ title: 'Plantilla subida' })
+                  } catch {
+                    toast({ title: 'Error al subir', variant: 'destructive' })
+                  } finally {
+                    setUploadingDoc(false)
+                    e.target.value = ''
+                  }
+                }}
+              />
+            </label>
+          )}
+        </div>
+
+        {loadingTemplates ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="border-2 border-dashed rounded-xl p-10 text-center">
+            <FileText size={32} className="mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm font-medium">Sin plantillas</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {canManage
+                ? 'Sube documentos Word, PDF o Excel para que los docentes los usen en sus entregas'
+                : 'El trainer aún no ha subido plantillas para este programa'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {templates.map((template) => (
+              <div
+                key={template.public_id}
+                className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
+              >
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${getFileColor(
+                    template.file_name,
+                  )}`}
+                >
+                  <FileText size={20} className="text-white" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{template.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {template.file_name}
+                    {template.file_size && (
+                      <span className="ml-2">· {formatFileSize(template.file_size)}</span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={async () => {
+                      const { url, file_name } = await api.get<{
+                        url: string
+                        file_name: string
+                      }>(
+                        `/training/programs/templates/${template.public_id}/download`,
+                      )
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = file_name
+                      a.click()
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    <Download size={14} />
+                    Descargar
+                  </button>
+
+                  {canManage && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm('¿Eliminar esta plantilla?')) return
+                        await api.delete(
+                          `/training/programs/templates/${template.public_id}`,
+                        )
+                        setTemplates((prev) =>
+                          prev.filter((t) => t.public_id !== template.public_id),
+                        )
+                        toast({ title: 'Plantilla eliminada' })
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function getFileColor(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  if (['doc', 'docx'].includes(ext ?? '')) return 'bg-blue-500'
+  if (['xls', 'xlsx'].includes(ext ?? '')) return 'bg-green-600'
+  if (['ppt', 'pptx'].includes(ext ?? '')) return 'bg-orange-500'
+  if (ext === 'pdf') return 'bg-red-500'
+  return 'bg-gray-500'
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }

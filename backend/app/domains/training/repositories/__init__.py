@@ -9,6 +9,7 @@ from app.domains.training.repositories.module_repository import ModuleRepository
 from app.domains.training.repositories.program_repository import ProgramRepository
 from app.domains.training.repositories.quiz_question_repository import QuizQuestionRepository
 from app.domains.training.repositories.submission_repository import SubmissionRepository
+from app.domains.training.repositories.template_repository import TemplateRepository
 
 __all__ = [
     "ProgramRepository",
@@ -20,4 +21,5 @@ __all__ = [
     "SubmissionRepository",
     "CertificateRepository",
     "LessonProgressRepository",
+    "TemplateRepository",
 ]

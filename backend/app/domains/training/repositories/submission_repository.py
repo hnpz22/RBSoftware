@@ -46,11 +46,23 @@ class SubmissionRepository:
         file_name: str | None = None,
         quiz_answers: dict | None = None,
     ) -> TrainingSubmission | None:
+        from app.domains.training.models.training_evaluation import TrainingEvaluation
+
+        evaluation = self.session.get(TrainingEvaluation, evaluation_id)
         existing = self.get_by_user_and_evaluation(user_id, evaluation_id)
 
         if existing is not None:
             if existing.status == TrainingSubmissionStatus.GRADED:
-                return None
+                if (
+                    evaluation is not None
+                    and existing.score is not None
+                    and existing.score >= evaluation.passing_score
+                ):
+                    return None
+                max_attempts = evaluation.max_attempts if evaluation is not None else 3
+                if existing.attempts_used >= max_attempts:
+                    return None
+
             if content is not None:
                 existing.content = content
             if file_key is not None:

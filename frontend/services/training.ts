@@ -33,6 +33,7 @@ export interface TrainingEvaluation {
   description: string | null
   max_score: number
   passing_score: number
+  max_attempts: number
   is_published: boolean
   after_lesson_id: number | null
   after_lesson_public_id: string | null
@@ -57,6 +58,7 @@ export interface TrainingSubmission {
   file_name: string | null
   quiz_answers: Record<string, number> | null
   score: number | null
+  attempts_used: number
   feedback: string | null
   status: string
   submitted_at: string | null
@@ -168,7 +170,7 @@ export function listEvaluations(moduleId: string) {
   return api.get<TrainingEvaluation[]>(`/training/modules/${moduleId}/evaluations`)
 }
 
-export function createEvaluation(moduleId: string, data: { title: string; type: string; description?: string | null; max_score?: number; passing_score?: number }) {
+export function createEvaluation(moduleId: string, data: { title: string; type: string; description?: string | null; max_score?: number; passing_score?: number; max_attempts?: number }) {
   return api.post<TrainingEvaluation>(`/training/modules/${moduleId}/evaluations`, data)
 }
 

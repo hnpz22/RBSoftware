@@ -13,6 +13,7 @@ class EvaluationCreate(SQLModel):
     description: str | None = None
     max_score: int = 100
     passing_score: int = 60
+    max_attempts: int = 3
 
 
 class EvaluationRead(SQLModel):
@@ -24,6 +25,7 @@ class EvaluationRead(SQLModel):
     description: str | None
     max_score: int
     passing_score: int
+    max_attempts: int
     is_published: bool
     after_lesson_id: int | None = None
     after_lesson_public_id: str | None = None
@@ -37,5 +39,6 @@ class EvaluationUpdate(SQLModel):
     description: str | None = None
     max_score: int | None = None
     passing_score: int | None = None
+    max_attempts: int | None = None
     is_published: bool | None = None
     after_lesson_public_id: str | None = None

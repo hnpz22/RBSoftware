@@ -39,6 +39,7 @@ from app.domains.training.schemas.training_submission import (
     SubmissionRead,
     SubmissionUpdate,
 )
+from app.domains.training.schemas.training_template import TemplateRead
 
 __all__ = [
     "ProgramCreate",
@@ -66,4 +67,5 @@ __all__ = [
     "EvaluationWithQuestions",
     "TeacherProgramProgress",
     "QuizSubmitRequest",
+    "TemplateRead",
 ]

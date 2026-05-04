@@ -24,6 +24,7 @@ class TrainingEvaluation(SQLModel, table=True):
     description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     max_score: int = Field(default=100, nullable=False)
     passing_score: int = Field(default=60, nullable=False)
+    max_attempts: int = Field(default=3, nullable=False)
     is_published: bool = Field(default=False, nullable=False)
     after_lesson_id: int | None = Field(
         default=None,

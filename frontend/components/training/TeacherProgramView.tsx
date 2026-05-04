@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Circle,
   ClipboardList,
+  Download,
   FileText,
   Lock,
   Menu,
@@ -19,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { api } from '@/lib/api'
 import type { TrainingProgram } from '@/lib/types'
 import type {
   TrainingModule,
@@ -43,6 +45,12 @@ interface ModuleEvals {
   evaluations: TrainingEvaluation[]
 }
 
+interface Template {
+  public_id: string
+  title: string
+  file_name: string
+}
+
 interface Props {
   program: TrainingProgram
   modules: TrainingModule[]
@@ -62,6 +70,7 @@ export function TeacherProgramView({ program, modules }: Props) {
   const [submissionMap, setSubmissionMap] = useState<Map<string, TrainingSubmission>>(new Map())
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [templates, setTemplates] = useState<Template[]>([])
 
   // Load all content on mount
   useEffect(() => {
@@ -114,6 +123,13 @@ export function TeacherProgramView({ program, modules }: Props) {
     else setLoading(false)
   }, [])
 
+  useEffect(() => {
+    api
+      .get<Template[]>(`/training/programs/${program.public_id}/templates`)
+      .then(setTemplates)
+      .catch(() => {})
+  }, [program.public_id])
+
   const currentLesson = allLessons[currentIndex] ?? null
   const totalLessons = allLessons.length
   const completedCount = completedSet.size
@@ -146,14 +162,17 @@ export function TeacherProgramView({ program, modules }: Props) {
     const prevLessons = allLessons.filter((l) => l.moduleIndex === moduleIndex - 1)
     const allLessonsCompleted = prevLessons.length > 0 && prevLessons.every((l) => completedSet.has(l.public_id))
 
-    // All evaluations of previous module must be passed
+    // All evaluations of previous module must be passed OR have attempts exhausted
     const prevEvalData = moduleEvals.find((me) => me.moduleId === prevModuleId)
-    const allEvalsApproved = !prevEvalData || prevEvalData.evaluations.every((ev) => {
+    const allEvalsCleared = !prevEvalData || prevEvalData.evaluations.every((ev) => {
       const sub = submissionMap.get(ev.public_id)
-      return sub?.status === 'GRADED' && (sub?.score ?? 0) >= ev.passing_score
+      if (sub?.status !== 'GRADED') return false
+      const passed = (sub.score ?? 0) >= ev.passing_score
+      const exhausted = sub.attempts_used >= ev.max_attempts
+      return passed || exhausted
     })
 
-    return allLessonsCompleted && allEvalsApproved
+    return allLessonsCompleted && allEvalsCleared
   }
 
   function canGoNext(): boolean {
@@ -292,6 +311,8 @@ export function TeacherProgramView({ program, modules }: Props) {
 
           {/* Certificate card in sidebar */}
           <CertificateStatus programId={program.public_id} />
+
+          <TemplatesSidebar templates={templates} />
         </div>
 
         {/* ── Main content ── */}
@@ -392,6 +413,56 @@ export function TeacherProgramView({ program, modules }: Props) {
       </div>
     </div>
   )
+}
+
+function TemplatesSidebar({ templates }: { templates: Template[] }) {
+  if (templates.length === 0) return null
+  return (
+    <div className="mx-3 mb-3 rounded-lg border bg-card">
+      <div className="px-3 py-2 border-b">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <FileText size={11} /> Plantillas
+        </p>
+      </div>
+      <div className="p-2 space-y-1">
+        {templates.map((template) => (
+          <button
+            key={template.public_id}
+            onClick={async () => {
+              const { url, file_name } = await api.get<{ url: string; file_name: string }>(
+                `/training/programs/templates/${template.public_id}/download`,
+              )
+              const a = document.createElement('a')
+              a.href = url
+              a.download = file_name
+              a.click()
+            }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 transition-colors text-left"
+            title={template.file_name}
+          >
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${getFileColor(
+                template.file_name,
+              )}`}
+            >
+              <FileText size={10} className="text-white" />
+            </div>
+            <span className="flex-1 min-w-0 text-xs truncate">{template.title}</span>
+            <Download size={12} className="text-muted-foreground shrink-0" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getFileColor(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  if (['doc', 'docx'].includes(ext ?? '')) return 'bg-blue-500'
+  if (['xls', 'xlsx'].includes(ext ?? '')) return 'bg-green-600'
+  if (['ppt', 'pptx'].includes(ext ?? '')) return 'bg-orange-500'
+  if (ext === 'pdf') return 'bg-red-500'
+  return 'bg-gray-500'
 }
 
 // ── PDF Viewer ──────────────────────────────────────────────────────────────
@@ -505,6 +576,9 @@ function EvaluationCard({ evaluation, onSubmissionUpdate }: { evaluation: Traini
 
   const isGraded = submission?.status === 'GRADED'
   const passed = isGraded && submission.score !== null && submission.score >= evaluation.passing_score
+  const attemptsUsed = submission?.attempts_used ?? 0
+  const canRetry = isGraded && !passed && attemptsUsed < evaluation.max_attempts
+  const exhausted = isGraded && !passed && attemptsUsed >= evaluation.max_attempts
 
   return (
     <div className="mt-3">
@@ -519,19 +593,35 @@ function EvaluationCard({ evaluation, onSubmissionUpdate }: { evaluation: Traini
               {submission.score}/{evaluation.max_score} — {passed ? 'Aprobado' : 'No aprobado'}
             </p>
           )}
+          {isGraded && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Intento {attemptsUsed} de {evaluation.max_attempts}
+            </p>
+          )}
           {submission?.status === 'SUBMITTED' && (
             <p className="mt-1 text-xs text-yellow-600">Pendiente de calificación</p>
           )}
           {isGraded && submission.feedback && (
             <p className="mt-1 text-xs text-muted-foreground">Feedback: {submission.feedback}</p>
           )}
+          {exhausted && (
+            <p className="mt-1 text-xs font-medium text-orange-600">
+              Agotaste tus intentos — puedes avanzar al siguiente módulo
+            </p>
+          )}
         </div>
         <div>
-          {!isGraded && evaluation.type === 'QUIZ' && (
+          {!submission && evaluation.type === 'QUIZ' && (
             <Button onClick={() => setShowQuiz(true)}>Hacer quiz</Button>
           )}
-          {!isGraded && evaluation.type === 'PRACTICAL' && submission?.status !== 'SUBMITTED' && (
+          {!submission && evaluation.type === 'PRACTICAL' && (
             <Button onClick={() => setShowPractical(true)}>Entregar</Button>
+          )}
+          {canRetry && evaluation.type === 'QUIZ' && (
+            <Button variant="outline" onClick={() => setShowQuiz(true)}>Reintentar quiz</Button>
+          )}
+          {canRetry && evaluation.type === 'PRACTICAL' && (
+            <Button variant="outline" onClick={() => setShowPractical(true)}>Reintentar entrega</Button>
           )}
           {passed && <CheckCircle2 size={24} className="text-green-500" />}
         </div>
@@ -594,6 +684,9 @@ function QuizModal({ evaluation, onClose, onSubmitted }: {
   const answeredCount = Object.keys(answers).length
   const totalQuestions = questions.length
   const passed = result?.score !== null && result?.score !== undefined && result.score >= evaluation.passing_score
+  const exhausted = result !== null && !passed && result.attempts_used >= evaluation.max_attempts
+  const canRetry = result !== null && !passed && !exhausted
+  const remainingAttempts = result ? evaluation.max_attempts - result.attempts_used : 0
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4">
@@ -620,16 +713,24 @@ function QuizModal({ evaluation, onClose, onSubmitted }: {
               <div className="mb-4 text-6xl">{passed ? '🎉' : '😔'}</div>
               <h3 className="mb-2 text-2xl font-bold">{passed ? '¡Aprobaste!' : 'No aprobaste'}</h3>
               <p className="mb-2 text-4xl font-bold">{result.score}/{evaluation.max_score}</p>
-              {!passed && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Intento {result.attempts_used} de {evaluation.max_attempts}
+              </p>
+              {canRetry && (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  Necesitas {evaluation.passing_score}/{evaluation.max_score} para aprobar. Puedes intentarlo de nuevo.
+                  Necesitas {evaluation.passing_score}/{evaluation.max_score} para aprobar. Te quedan {remainingAttempts} intento{remainingAttempts === 1 ? '' : 's'}.
+                </p>
+              )}
+              {exhausted && (
+                <p className="mt-4 text-sm font-medium text-orange-600">
+                  Agotaste tus intentos. Puedes avanzar al siguiente módulo.
                 </p>
               )}
               <button
                 onClick={() => onSubmitted(result)}
                 className="mt-6 rounded-lg bg-primary px-6 py-2 font-medium text-primary-foreground hover:bg-primary/90"
               >
-                {passed ? 'Continuar →' : 'Cerrar'}
+                {passed || exhausted ? 'Continuar →' : 'Cerrar'}
               </button>
             </div>
           )}

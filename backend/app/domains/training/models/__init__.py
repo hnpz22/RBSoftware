@@ -9,6 +9,7 @@ from app.domains.training.models.training_enrollment import TrainingEnrollment
 from app.domains.training.models.training_submission import TrainingSubmission
 from app.domains.training.models.training_certificate import TrainingCertificate
 from app.domains.training.models.training_lesson_progress import TrainingLessonProgress
+from app.domains.training.models.training_template import TrainingTemplate
 
 __all__ = [
     "TrainingProgram",
@@ -20,4 +21,5 @@ __all__ = [
     "TrainingSubmission",
     "TrainingCertificate",
     "TrainingLessonProgress",
+    "TrainingTemplate",
 ]

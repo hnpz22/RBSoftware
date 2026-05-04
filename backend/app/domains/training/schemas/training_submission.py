@@ -16,6 +16,7 @@ class SubmissionRead(SQLModel):
     file_name: str | None
     quiz_answers: Any | None
     score: int | None
+    attempts_used: int
     feedback: str | None
     status: Literal["PENDING", "SUBMITTED", "GRADED"]
     submitted_at: datetime | None

@@ -391,12 +391,19 @@ class TrainingService:
         existing = submission_repo.get_by_user_and_evaluation(user_id, evaluation.id)
         if existing is not None:
             if existing.status == TrainingSubmissionStatus.GRADED:
-                raise ValueError("Esta evaluación ya fue calificada")
+                if (
+                    existing.score is not None
+                    and existing.score >= evaluation.passing_score
+                ):
+                    raise ValueError("Esta evaluación ya fue aprobada")
+                if existing.attempts_used >= evaluation.max_attempts:
+                    raise ValueError("Agotaste los intentos para esta evaluación")
             existing.quiz_answers = answers
-            existing.score = score
+            existing.score = max(existing.score or 0, score)
             existing.status = TrainingSubmissionStatus.GRADED
             existing.submitted_at = now
             existing.graded_at = now
+            existing.attempts_used = existing.attempts_used + 1
             session.add(existing)
             session.commit()
             session.refresh(existing)
@@ -410,6 +417,7 @@ class TrainingService:
             status=TrainingSubmissionStatus.GRADED,
             submitted_at=now,
             graded_at=now,
+            attempts_used=1,
         )
         session.add(submission)
         session.commit()
@@ -480,11 +488,12 @@ class TrainingService:
             )
 
         now = datetime.now(timezone.utc)
-        submission.score = score
+        submission.score = max(submission.score or 0, score)
         submission.feedback = feedback
         submission.status = TrainingSubmissionStatus.GRADED
         submission.graded_by = trainer_id
         submission.graded_at = now
+        submission.attempts_used = submission.attempts_used + 1
         session.add(submission)
         session.commit()
         session.refresh(submission)

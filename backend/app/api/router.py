@@ -29,6 +29,7 @@ from app.domains.training.routes.evaluations import router as training_evaluatio
 from app.domains.training.routes.submissions import router as training_submissions_router
 from app.domains.training.routes.enrollments import router as training_enrollments_router
 from app.domains.training.routes.certificates import router as training_certificates_router
+from app.domains.training.routes.templates import router as training_templates_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -61,3 +62,4 @@ api_router.include_router(training_evaluations_router)
 api_router.include_router(training_submissions_router)
 api_router.include_router(training_enrollments_router)
 api_router.include_router(training_certificates_router)
+api_router.include_router(training_templates_router)

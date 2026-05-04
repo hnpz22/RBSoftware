@@ -44,6 +44,7 @@ class TrainingSubmission(SQLModel, table=True):
         sa_column=Column(JSON, nullable=True),
     )
     score: int | None = Field(default=None, nullable=True)
+    attempts_used: int = Field(default=0, nullable=False)
     feedback: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     status: str = Field(
         default=TrainingSubmissionStatus.PENDING,
