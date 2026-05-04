@@ -16,6 +16,15 @@ import {
   TrendingUp,
   Users2,
 } from 'lucide-react'
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { ErrorBanner } from '@/components/error-banner'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -85,6 +94,152 @@ function StatCard({
 
 // ── Role-specific panels ─────────────────────────────────────────────────────
 
+function ConnStatsSection({ title }: { title: string }) {
+  const [connStats, setConnStats] = useState<any>(null)
+  const [connDays, setConnDays] = useState(7)
+  const [loadingConn, setLoadingConn] = useState(false)
+
+  useEffect(() => {
+    setLoadingConn(true)
+    api
+      .get(`/auth/users/connection-stats?days=${connDays}`)
+      .then(setConnStats)
+      .catch(() => {})
+      .finally(() => setLoadingConn(false))
+  }, [connDays])
+
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">Inicios de sesión por día</p>
+        </div>
+        <div className="flex gap-2">
+          {[7, 14, 30].map((d) => (
+            <button
+              key={d}
+              onClick={() => setConnDays(d)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                connDays === d ? 'bg-primary text-white' : 'border hover:bg-muted'
+              }`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loadingConn ? (
+        <div className="h-64 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      ) : connStats ? (
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl border bg-card p-4 text-center">
+              <p className="text-3xl font-bold text-primary">{connStats.total_logins}</p>
+              <p className="text-xs text-muted-foreground mt-1">Inicios de sesión</p>
+            </div>
+            <div className="rounded-xl border bg-card p-4 text-center">
+              <p className="text-3xl font-bold text-green-600">{connStats.unique_users}</p>
+              <p className="text-xs text-muted-foreground mt-1">Usuarios únicos</p>
+            </div>
+            <div className="rounded-xl border bg-card p-4 text-center">
+              <p className="text-3xl font-bold text-orange-500">{connStats.total_logouts}</p>
+              <p className="text-xs text-muted-foreground mt-1">Cierres de sesión</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card p-6">
+            <h3 className="text-sm font-semibold mb-4">Conexiones diarias</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart
+                data={connStats.logins_by_day}
+                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) =>
+                    new Date(v).toLocaleDateString('es', {
+                      day: '2-digit',
+                      month: 'short',
+                    })
+                  }
+                />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip
+                  formatter={(value) => [value, 'Conexiones']}
+                  labelFormatter={(label) =>
+                    new Date(label).toLocaleDateString('es', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                    })
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="logins"
+                  stroke="#1A237E"
+                  strokeWidth={2}
+                  dot={{ fill: '#FF6F00', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {connStats.top_users.length > 0 && (
+            <div className="rounded-xl border bg-card p-6">
+              <h3 className="text-sm font-semibold mb-4">Usuarios más activos</h3>
+              <div className="space-y-2">
+                {connStats.top_users.map((u: any, i: number) => (
+                  <div
+                    key={u.user_id}
+                    className="flex items-center gap-3 py-2 border-b last:border-0"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{u.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-primary">{u.login_count}</p>
+                      <p className="text-xs text-muted-foreground">conexiones</p>
+                    </div>
+                    <div className="w-20 hidden md:block">
+                      <div className="h-1.5 rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{
+                            width: `${(
+                              (u.login_count / connStats.top_users[0].login_count) *
+                              100
+                            ).toFixed(0)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+          No hay datos de conexión disponibles
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AdminPanel() {
   const [stats, setStats] = useState({
     pendingOrders: 0,
@@ -127,36 +282,39 @@ function AdminPanel() {
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatCard
-        title="Pedidos Pendientes"
-        value={stats.pendingOrders}
-        subtitle="Órdenes por aprobar"
-        icon={ShoppingCart}
-        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-      />
-      <StatCard
-        title="Lotes Activos"
-        value={stats.activeBatches}
-        subtitle="En producción"
-        icon={Package}
-        gradient="bg-gradient-to-br from-orange-500 to-orange-700"
-      />
-      <StatCard
-        title="Stock Crítico"
-        value={stats.criticalStock}
-        subtitle="Productos sin unidades FREE"
-        icon={AlertTriangle}
-        gradient="bg-gradient-to-br from-green-500 to-green-700"
-        href="/inventory?color=RED"
-      />
-      <StatCard
-        title="Cursos Activos"
-        value={stats.activeCourses}
-        subtitle="Cursos en el sistema"
-        icon={BookOpen}
-        gradient="bg-gradient-to-br from-purple-500 to-purple-700"
-      />
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Pedidos Pendientes"
+          value={stats.pendingOrders}
+          subtitle="Órdenes por aprobar"
+          icon={ShoppingCart}
+          gradient="bg-gradient-to-br from-blue-500 to-blue-700"
+        />
+        <StatCard
+          title="Lotes Activos"
+          value={stats.activeBatches}
+          subtitle="En producción"
+          icon={Package}
+          gradient="bg-gradient-to-br from-orange-500 to-orange-700"
+        />
+        <StatCard
+          title="Stock Crítico"
+          value={stats.criticalStock}
+          subtitle="Productos sin unidades FREE"
+          icon={AlertTriangle}
+          gradient="bg-gradient-to-br from-green-500 to-green-700"
+          href="/inventory?color=RED"
+        />
+        <StatCard
+          title="Cursos Activos"
+          value={stats.activeCourses}
+          subtitle="Cursos en el sistema"
+          icon={BookOpen}
+          gradient="bg-gradient-to-br from-purple-500 to-purple-700"
+        />
+      </div>
+      <ConnStatsSection title="Actividad de conexiones" />
     </div>
   )
 }
@@ -404,29 +562,32 @@ function DirectorPanel() {
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      <StatCard
-        title="Mis Grados"
-        value={stats.gradesCount}
-        subtitle="Grados asignados"
-        icon={Layers}
-        gradient="bg-gradient-to-br from-purple-500 to-purple-700"
-        href="/academic/grades"
-      />
-      <StatCard
-        title="Total Estudiantes"
-        value={stats.totalStudents}
-        subtitle="En mis grados"
-        icon={Users2}
-        gradient="bg-gradient-to-br from-pink-500 to-pink-700"
-      />
-      <StatCard
-        title="Cursos Activos"
-        value={stats.activeCourses}
-        subtitle="En mis grados"
-        icon={BookOpen}
-        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-      />
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatCard
+          title="Mis Grados"
+          value={stats.gradesCount}
+          subtitle="Grados asignados"
+          icon={Layers}
+          gradient="bg-gradient-to-br from-purple-500 to-purple-700"
+          href="/academic/grades"
+        />
+        <StatCard
+          title="Total Estudiantes"
+          value={stats.totalStudents}
+          subtitle="En mis grados"
+          icon={Users2}
+          gradient="bg-gradient-to-br from-pink-500 to-pink-700"
+        />
+        <StatCard
+          title="Cursos Activos"
+          value={stats.activeCourses}
+          subtitle="En mis grados"
+          icon={BookOpen}
+          gradient="bg-gradient-to-br from-blue-500 to-blue-700"
+        />
+      </div>
+      <ConnStatsSection title="Actividad de mis estudiantes y docentes" />
     </div>
   )
 }
