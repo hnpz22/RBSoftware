@@ -145,6 +145,22 @@ def _get_connection_stats(
                 "login_count": row.login_count,
             })
 
+    # Logins por hora del día
+    hour_stmt = (
+        select(
+            func.hour(AuditLog.created_at).label("hour"),
+            func.count(AuditLog.id).label("logins"),
+        )
+        .where(AuditLog.action == "auth.login", AuditLog.created_at >= since)
+    )
+    if filter_user is not None:
+        hour_stmt = hour_stmt.where(AuditLog.user_id == filter_user.id)
+    elif allowed_user_ids is not None:
+        hour_stmt = hour_stmt.where(AuditLog.user_id.in_(allowed_user_ids))
+    hour_stmt = hour_stmt.group_by(func.hour(AuditLog.created_at)).order_by("hour")
+    hour_map = {r.hour: r.logins for r in session.exec(hour_stmt).all()}
+    logins_by_hour = [{"hour": h, "logins": hour_map.get(h, 0)} for h in range(24)]
+
     # Totales
     total_logins = sum(r.logins for r in logins_by_day)
 
@@ -170,6 +186,7 @@ def _get_connection_stats(
         "total_logouts": total_logouts,
         "unique_users": unique_users,
         "logins_by_day": [{"date": str(r.date), "logins": r.logins} for r in logins_by_day],
+        "logins_by_hour": logins_by_hour,
         "top_users": top_users,
     }
 

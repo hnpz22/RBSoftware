@@ -17,6 +17,8 @@ import {
   Users2,
 } from 'lucide-react'
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -191,6 +193,35 @@ function ConnStatsSection({ title }: { title: string }) {
               </LineChart>
             </ResponsiveContainer>
           </div>
+
+          <div className="rounded-xl border bg-card p-6">
+              <h3 className="text-sm font-semibold mb-4">Conexiones por hora del día</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={connStats.logins_by_hour}
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis
+                    dataKey="hour"
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(h) =>
+                      h % 3 === 0
+                        ? h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`
+                        : ''
+                    }
+                  />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip
+                    formatter={(value) => [value, 'Conexiones']}
+                    labelFormatter={(h) =>
+                      h === 0 ? '12:00 am' : h < 12 ? `${h}:00 am` : h === 12 ? '12:00 pm' : `${h - 12}:00 pm`
+                    }
+                  />
+                  <Bar dataKey="logins" fill="#1A237E" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
           {connStats.top_users.length > 0 && (
             <div className="rounded-xl border bg-card p-6">
