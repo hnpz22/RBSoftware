@@ -480,7 +480,7 @@ export default function RepositoryPage() {
 
         {searchResults && (
           <div className="flex items-center gap-2 border-b border-gray-100 bg-white px-6 py-2 text-sm text-gray-500">
-            <span>Resultados para "{query}"</span>
+            <span>Resultados para &quot;{query}&quot;</span>
             <button
               onClick={() => {
                 setQuery('')
