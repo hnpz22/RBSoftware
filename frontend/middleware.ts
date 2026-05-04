@@ -19,6 +19,7 @@ const ROUTE_ROLES: [string, string[]][] = [
   ['/training/programs', ['ADMIN', 'TRAINER', 'SUPER_TRAINER', 'TEACHER']],
   ['/training/my-programs', ['ADMIN', 'TEACHER']],
   ['/training/certificates', ['ADMIN', 'TEACHER']],
+  ['/repository', ['ADMIN', 'TRAINER', 'SUPER_TRAINER', 'TEACHER']],
 ]
 
 function parseRoles(cookie: string | undefined): string[] {

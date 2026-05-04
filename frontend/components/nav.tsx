@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  FolderOpen,
   GraduationCap,
   Layers,
   LayoutDashboard,
@@ -77,6 +78,7 @@ export function Nav() {
         },
         { href: '/training/grading',      label: 'Calificaciones',   icon: ClipboardList, visible: () => isAdmin() || hasRole('TRAINER') || hasRole('SUPER_TRAINER') },
         { href: '/training/certificates', label: 'Mis Certificados', icon: Award,         visible: () => hasRole('TEACHER') },
+        { href: '/repository',            label: 'Repositorio',      icon: FolderOpen,    visible: () => isAdmin() || hasRole('TRAINER') || hasRole('SUPER_TRAINER') || hasRole('TEACHER') },
       ],
     },
     {
