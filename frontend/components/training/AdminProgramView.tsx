@@ -1306,7 +1306,7 @@ function TemplatesTab({ program }: { program: TrainingProgram }) {
                       `/training/programs/${program.public_id}/templates`,
                     )
                     setTemplates(updated)
-                    toast({ title: 'Plantilla subida' })
+                    toast({ title: 'Plantilla subida', variant: 'success' })
                   } catch {
                     toast({ title: 'Error al subir', variant: 'destructive' })
                   } finally {
@@ -1388,7 +1388,7 @@ function TemplatesTab({ program }: { program: TrainingProgram }) {
                         setTemplates((prev) =>
                           prev.filter((t) => t.public_id !== template.public_id),
                         )
-                        toast({ title: 'Plantilla eliminada' })
+                        toast({ title: 'Plantilla eliminada', variant: 'default' })
                       }}
                       className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                     >
