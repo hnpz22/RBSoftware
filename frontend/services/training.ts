@@ -148,6 +148,21 @@ export function createLesson(moduleId: string, formData: FormData) {
   return api.postForm<TrainingLesson>(`/training/modules/${moduleId}/lessons`, formData)
 }
 
+export function createLessonFromRepository(
+  moduleId: string,
+  data: {
+    title: string
+    type: 'PDF' | 'VIDEO'
+    file_id: string
+    duration_minutes: number | null
+  },
+) {
+  return api.post<TrainingLesson>(
+    `/training/modules/${moduleId}/lessons/from-repository`,
+    data,
+  )
+}
+
 export function updateLesson(lessonId: string, data: Partial<TrainingLesson>) {
   return api.patch<TrainingLesson>(`/training/lessons/${lessonId}`, data)
 }

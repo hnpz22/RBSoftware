@@ -10,9 +10,12 @@ import {
   Check,
   CheckCircle2,
   Circle,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   Download,
   FileText,
+  Folder,
   Lock,
   Menu,
   Send,
@@ -313,6 +316,8 @@ export function TeacherProgramView({ program, modules }: Props) {
           <CertificateStatus programId={program.public_id} />
 
           <TemplatesSidebar templates={templates} />
+
+          <ResourcesSidebar programId={program.public_id} />
         </div>
 
         {/* ── Main content ── */}
@@ -463,6 +468,132 @@ function getFileColor(fileName: string) {
   if (['ppt', 'pptx'].includes(ext ?? '')) return 'bg-orange-500'
   if (ext === 'pdf') return 'bg-red-500'
   return 'bg-gray-500'
+}
+
+interface ResourceFile {
+  public_id: string
+  name: string
+  file_name: string
+}
+
+interface ResourceFolder {
+  public_id: string
+  name: string
+  file_count: number
+}
+
+function ResourcesSidebar({ programId }: { programId: string }) {
+  const [folders, setFolders] = useState<ResourceFolder[]>([])
+  const [files, setFiles] = useState<ResourceFile[]>([])
+  const [expanded, setExpanded] = useState<Record<string, ResourceFile[] | undefined>>({})
+
+  useEffect(() => {
+    api
+      .get<{ folders: ResourceFolder[]; files: ResourceFile[] }>(
+        `/repository/programs/${programId}/resources`,
+      )
+      .then((data) => {
+        setFolders(data.folders)
+        setFiles(data.files)
+      })
+      .catch(() => {})
+  }, [programId])
+
+  async function toggleFolder(folder: ResourceFolder) {
+    if (expanded[folder.public_id] !== undefined) {
+      setExpanded((s) => ({ ...s, [folder.public_id]: undefined }))
+      return
+    }
+    try {
+      const data = await api.get<{ files: ResourceFile[] }>(
+        `/repository/folders/${folder.public_id}`,
+      )
+      setExpanded((s) => ({ ...s, [folder.public_id]: data.files }))
+    } catch {
+      setExpanded((s) => ({ ...s, [folder.public_id]: [] }))
+    }
+  }
+
+  async function downloadFile(fileId: string) {
+    try {
+      const { url } = await api.get<{ url: string; file_name: string }>(
+        `/repository/files/${fileId}/download`,
+      )
+      window.open(url, '_blank')
+    } catch {}
+  }
+
+  if (folders.length === 0 && files.length === 0) return null
+
+  return (
+    <div className="mx-3 mb-3 rounded-lg border bg-card">
+      <div className="border-b px-3 py-2">
+        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <Folder size={11} /> Recursos
+        </p>
+      </div>
+      <div className="space-y-1 p-2">
+        {folders.map((folder) => {
+          const open = expanded[folder.public_id] !== undefined
+          return (
+            <div key={folder.public_id}>
+              <button
+                onClick={() => toggleFolder(folder)}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
+              >
+                {open ? (
+                  <ChevronDown size={12} className="shrink-0 text-muted-foreground" />
+                ) : (
+                  <ChevronRight size={12} className="shrink-0 text-muted-foreground" />
+                )}
+                <Folder size={12} className="shrink-0 text-yellow-500" />
+                <span className="min-w-0 flex-1 truncate text-xs">{folder.name}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {folder.file_count}
+                </span>
+              </button>
+              {open && expanded[folder.public_id] && (
+                <div className="ml-5 mt-1 space-y-1">
+                  {(expanded[folder.public_id] ?? []).map((f) => (
+                    <button
+                      key={f.public_id}
+                      onClick={() => downloadFile(f.public_id)}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-muted/50"
+                      title={f.file_name}
+                    >
+                      <div
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${getFileColor(f.file_name)}`}
+                      >
+                        <FileText size={8} className="text-white" />
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-xs">{f.name}</span>
+                      <Download size={10} className="shrink-0 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {files.map((file) => (
+          <button
+            key={file.public_id}
+            onClick={() => downloadFile(file.public_id)}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
+            title={file.file_name}
+          >
+            <div
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded ${getFileColor(file.file_name)}`}
+            >
+              <FileText size={10} className="text-white" />
+            </div>
+            <span className="min-w-0 flex-1 truncate text-xs">{file.name}</span>
+            <Download size={12} className="shrink-0 text-muted-foreground" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ── PDF Viewer ──────────────────────────────────────────────────────────────

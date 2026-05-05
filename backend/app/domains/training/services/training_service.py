@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.storage import storage_service
+from app.domains.repository.models.repository_file import RepositoryFile
 from app.domains.audit.services import AuditService
 from app.domains.auth.repositories import UserRepository
 from app.domains.rbac.repositories import UserRoleRepository
@@ -190,6 +191,37 @@ class TrainingService:
         if file_key:
             overrides["file_key"] = file_key
         data_with_file = LessonCreate.model_validate(data.model_dump() | overrides)
+        return LessonRepository(session).create(module.id, data_with_file)
+
+    def create_lesson_from_repository(
+        self,
+        session: Session,
+        module_id: UUID,
+        data: LessonCreate,
+        repository_file_public_id: str,
+        requesting_user_id: int,
+    ):
+        self._assert_admin_or_trainer(session, requesting_user_id)
+        module = ModuleRepository(session).get_by_public_id(module_id)
+        if module is None:
+            raise LookupError("Módulo no encontrado")
+
+        repo_file = session.exec(
+            select(RepositoryFile).where(
+                RepositoryFile.public_id == repository_file_public_id
+            )
+        ).first()
+        if repo_file is None:
+            raise LookupError("Archivo no encontrado en repositorio")
+
+        if data.type not in ("PDF", "VIDEO"):
+            raise ValueError("El tipo debe ser PDF o VIDEO")
+
+        existing = LessonRepository(session).list_by_module(module.id)
+        data_with_file = LessonCreate.model_validate(
+            data.model_dump()
+            | {"order_index": len(existing), "file_key": repo_file.file_key}
+        )
         return LessonRepository(session).create(module.id, data_with_file)
 
     # ── Evaluation management ────────────────────────────────────────────────

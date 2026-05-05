@@ -354,3 +354,217 @@ def search(
         "folders": [_folder_read(f, session) for f in folders],
         "files": [_file_read(f, session) for f in files],
     }
+
+
+# ── Program ↔ Repository ──────────────────────────────────────────────────────
+
+class AssignFolderRequest(BaseModel):
+    folder_id: str
+
+
+class AssignFileRequest(BaseModel):
+    file_id: str
+
+
+def _get_program_or_404(session: Session, program_public_id: str):
+    from app.domains.training.models.training_program import TrainingProgram
+    try:
+        program_uuid = uuid_module.UUID(program_public_id)
+    except ValueError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Programa no encontrado")
+    program = session.exec(
+        select(TrainingProgram).where(TrainingProgram.public_id == program_uuid)
+    ).first()
+    if program is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Programa no encontrado")
+    return program
+
+
+def _user_role_names(session: Session, user_id: int) -> set[str]:
+    from app.domains.rbac.repositories import UserRoleRepository
+    return set(UserRoleRepository(session).get_role_names_for_user(user_id))
+
+
+def _assert_program_staff(session: Session, program, user: User) -> None:
+    roles = _user_role_names(session, user.id)
+    if "ADMIN" in roles or "SUPER_TRAINER" in roles:
+        return
+    if "TRAINER" in roles and program.created_by == user.id:
+        return
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permisos sobre este programa")
+
+
+def _assert_program_access(session: Session, program, user: User) -> None:
+    roles = _user_role_names(session, user.id)
+    if roles & {"ADMIN", "SUPER_TRAINER"}:
+        return
+    if "TRAINER" in roles and program.created_by == user.id:
+        return
+    from app.domains.training.repositories.enrollment_repository import EnrollmentRepository
+    enrollments = EnrollmentRepository(session).list_by_user(user.id)
+    if any(e.program_id == program.id for e in enrollments):
+        return
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "No tienes acceso a este programa")
+
+
+@router.get("/programs/{program_id}/resources")
+def list_program_resources(
+    program_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    from app.domains.repository.models.program_repository_folder import ProgramRepositoryFolder
+    from app.domains.repository.models.program_repository_file import ProgramRepositoryFile
+
+    program = _get_program_or_404(session, program_id)
+    _assert_program_access(session, program, current_user)
+
+    folder_links = session.exec(
+        select(ProgramRepositoryFolder).where(ProgramRepositoryFolder.program_id == program.id)
+    ).all()
+    folders_out = []
+    for link in folder_links:
+        folder = session.get(RepositoryFolder, link.folder_id)
+        if folder is None:
+            continue
+        file_count = len(
+            session.exec(select(RepositoryFile).where(RepositoryFile.folder_id == folder.id)).all()
+        )
+        folders_out.append({
+            "public_id": folder.public_id,
+            "name": folder.name,
+            "description": folder.description,
+            "file_count": file_count,
+        })
+
+    file_links = session.exec(
+        select(ProgramRepositoryFile).where(ProgramRepositoryFile.program_id == program.id)
+    ).all()
+    files_out = []
+    for link in file_links:
+        f = session.get(RepositoryFile, link.file_id)
+        if f is None:
+            continue
+        files_out.append({
+            "public_id": f.public_id,
+            "name": f.name,
+            "file_name": f.file_name,
+            "file_size": f.file_size,
+            "file_type": f.file_type,
+        })
+
+    return {"folders": folders_out, "files": files_out}
+
+
+@router.post("/programs/{program_id}/assign-folder", status_code=status.HTTP_201_CREATED)
+def assign_folder_to_program(
+    program_id: str,
+    body: AssignFolderRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    from app.domains.repository.models.program_repository_folder import ProgramRepositoryFolder
+
+    program = _get_program_or_404(session, program_id)
+    _assert_program_staff(session, program, current_user)
+    folder = _get_folder(session, body.folder_id)
+
+    existing = session.exec(
+        select(ProgramRepositoryFolder).where(
+            ProgramRepositoryFolder.program_id == program.id,
+            ProgramRepositoryFolder.folder_id == folder.id,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status.HTTP_409_CONFLICT, "La carpeta ya está asignada a este programa")
+
+    link = ProgramRepositoryFolder(
+        program_id=program.id,
+        folder_id=folder.id,
+        assigned_by=current_user.id,
+    )
+    session.add(link)
+    session.commit()
+    return {"message": "Carpeta asignada"}
+
+
+@router.delete("/programs/{program_id}/folders/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unassign_folder_from_program(
+    program_id: str,
+    folder_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    from app.domains.repository.models.program_repository_folder import ProgramRepositoryFolder
+
+    program = _get_program_or_404(session, program_id)
+    _assert_program_staff(session, program, current_user)
+    folder = _get_folder(session, folder_id)
+
+    link = session.exec(
+        select(ProgramRepositoryFolder).where(
+            ProgramRepositoryFolder.program_id == program.id,
+            ProgramRepositoryFolder.folder_id == folder.id,
+        )
+    ).first()
+    if link is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La carpeta no está asignada a este programa")
+    session.delete(link)
+    session.commit()
+
+
+@router.post("/programs/{program_id}/assign-file", status_code=status.HTTP_201_CREATED)
+def assign_file_to_program(
+    program_id: str,
+    body: AssignFileRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    from app.domains.repository.models.program_repository_file import ProgramRepositoryFile
+
+    program = _get_program_or_404(session, program_id)
+    _assert_program_staff(session, program, current_user)
+    f = _get_file(session, body.file_id)
+
+    existing = session.exec(
+        select(ProgramRepositoryFile).where(
+            ProgramRepositoryFile.program_id == program.id,
+            ProgramRepositoryFile.file_id == f.id,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status.HTTP_409_CONFLICT, "El archivo ya está asignado a este programa")
+
+    link = ProgramRepositoryFile(
+        program_id=program.id,
+        file_id=f.id,
+        assigned_by=current_user.id,
+    )
+    session.add(link)
+    session.commit()
+    return {"message": "Archivo asignado"}
+
+
+@router.delete("/programs/{program_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unassign_file_from_program(
+    program_id: str,
+    file_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    from app.domains.repository.models.program_repository_file import ProgramRepositoryFile
+
+    program = _get_program_or_404(session, program_id)
+    _assert_program_staff(session, program, current_user)
+    f = _get_file(session, file_id)
+
+    link = session.exec(
+        select(ProgramRepositoryFile).where(
+            ProgramRepositoryFile.program_id == program.id,
+            ProgramRepositoryFile.file_id == f.id,
+        )
+    ).first()
+    if link is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "El archivo no está asignado a este programa")
+    session.delete(link)
+    session.commit()

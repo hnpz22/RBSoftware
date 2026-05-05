@@ -8,12 +8,14 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   ClipboardCheck,
   Download,
   Eye,
   EyeOff,
   FileText,
+  Folder,
   Plus,
   Trash2,
   Upload,
@@ -45,7 +47,7 @@ interface Props {
   reload: () => void
 }
 
-type ProgramTab = 'content' | 'enrolled' | 'gradebook' | 'practicals' | 'templates'
+type ProgramTab = 'content' | 'resources' | 'enrolled' | 'gradebook' | 'practicals' | 'templates'
 
 // ── Main component ──────────────────────────────────────────────────────────
 
@@ -67,6 +69,7 @@ export function AdminProgramView({ program, modules, reload }: Props) {
 
   const programTabs: { key: ProgramTab; label: string }[] = [
     { key: 'content', label: 'Contenido' },
+    { key: 'resources', label: 'Recursos' },
     { key: 'enrolled', label: 'Inscritos' },
     { key: 'gradebook', label: 'Planilla' },
     { key: 'practicals', label: 'Entregas Prácticas' },
@@ -200,6 +203,9 @@ export function AdminProgramView({ program, modules, reload }: Props) {
       {/* Tab content */}
       {programTab === 'content' && (
         <ContentTab program={program} modules={modules} reload={reload} />
+      )}
+      {programTab === 'resources' && (
+        <ResourcesTab program={program} canManage />
       )}
       {programTab === 'enrolled' && (
         <EnrolledTab program={program} />
@@ -886,6 +892,9 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
   const [videoMode, setVideoMode] = useState<'url' | 'file'>('url')
   const [videoUrl, setVideoUrl] = useState('')
   const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [sourceMode, setSourceMode] = useState<'upload' | 'repository'>('upload')
+  const [repoFile, setRepoFile] = useState<RepoFile | null>(null)
+  const [showRepoPicker, setShowRepoPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   return (
@@ -897,22 +906,36 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
         <form onSubmit={async (e) => {
           e.preventDefault(); setError(null); setSaving(true)
           try {
-            const fd = new FormData()
-            fd.append('title', form.title.trim())
-            fd.append('type', form.type)
-            if (form.duration_minutes) fd.append('duration_minutes', form.duration_minutes)
-            if (form.type === 'TEXT' && form.content.trim()) {
-              fd.append('content', form.content.trim())
-            } else if (form.type === 'PDF' && file) {
-              fd.append('file', file)
-            } else if (form.type === 'VIDEO') {
-              if (videoMode === 'url' && videoUrl.trim()) {
-                fd.append('content', videoUrl.trim())
-              } else if (videoMode === 'file' && videoFile) {
-                fd.append('file', videoFile)
+            const useRepo =
+              sourceMode === 'repository' &&
+              repoFile &&
+              (form.type === 'PDF' || (form.type === 'VIDEO' && videoMode === 'file'))
+            if (useRepo && repoFile) {
+              await trainingService.createLessonFromRepository(moduleId, {
+                title: form.title.trim(),
+                type: form.type as 'PDF' | 'VIDEO',
+                file_id: repoFile.public_id,
+                duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
+              })
+            } else {
+              const fd = new FormData()
+              fd.append('title', form.title.trim())
+              fd.append('type', form.type)
+              if (form.duration_minutes) fd.append('duration_minutes', form.duration_minutes)
+              if (form.type === 'TEXT' && form.content.trim()) {
+                fd.append('content', form.content.trim())
+              } else if (form.type === 'PDF' && file) {
+                fd.append('file', file)
+              } else if (form.type === 'VIDEO') {
+                if (videoMode === 'url' && videoUrl.trim()) {
+                  fd.append('content', videoUrl.trim())
+                } else if (videoMode === 'file' && videoFile) {
+                  fd.append('file', videoFile)
+                }
               }
+              await trainingService.createLesson(moduleId, fd)
             }
-            await trainingService.createLesson(moduleId, fd); onCreated()
+            onCreated()
           } catch (err: any) { setError(err?.detail ?? 'Error') } finally { setSaving(false) }
         }} className="space-y-3 px-5 py-4">
           <div className="space-y-1"><label className="text-xs font-medium">Título *</label>
@@ -926,9 +949,41 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
           {form.type === 'TEXT' && <div className="space-y-1"><label className="text-xs font-medium">Contenido</label>
             <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} /></div>}
           {form.type === 'PDF' && (
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Archivo</label>
-              <input type="file" accept=".pdf" className="block w-full text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSourceMode('upload')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    sourceMode === 'upload'
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  ↑ Subir archivo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceMode('repository')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    sourceMode === 'repository'
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  📁 Del repositorio
+                </button>
+              </div>
+              {sourceMode === 'upload' && (
+                <input type="file" accept=".pdf"
+                  className="block w-full text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              )}
+              {sourceMode === 'repository' && (
+                <RepoFilePickerField repoFile={repoFile}
+                  onPick={() => setShowRepoPicker(true)}
+                  onClear={() => setRepoFile(null)} />
+              )}
             </div>
           )}
           {form.type === 'VIDEO' && (
@@ -943,18 +998,29 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  🔗 Link de YouTube
+                  🔗 Link
                 </button>
                 <button
                   type="button"
-                  onClick={() => setVideoMode('file')}
+                  onClick={() => { setVideoMode('file'); setSourceMode('upload') }}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    videoMode === 'file'
+                    videoMode === 'file' && sourceMode === 'upload'
                       ? 'bg-primary text-white border-primary'
                       : 'border-border hover:bg-muted'
                   }`}
                 >
-                  📁 Subir archivo
+                  ↑ Subir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setVideoMode('file'); setSourceMode('repository') }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    videoMode === 'file' && sourceMode === 'repository'
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  📁 Repositorio
                 </button>
               </div>
               {videoMode === 'url' && (
@@ -970,7 +1036,7 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
                   <p className="text-xs text-muted-foreground">Soporta YouTube, Vimeo y otros</p>
                 </div>
               )}
-              {videoMode === 'file' && (
+              {videoMode === 'file' && sourceMode === 'upload' && (
                 <input
                   type="file"
                   accept="video/*"
@@ -978,7 +1044,20 @@ function CreateLessonModal({ moduleId, onClose, onCreated }: {
                   className="w-full text-sm border rounded-lg p-2 bg-background"
                 />
               )}
+              {videoMode === 'file' && sourceMode === 'repository' && (
+                <RepoFilePickerField repoFile={repoFile}
+                  onPick={() => setShowRepoPicker(true)}
+                  onClear={() => setRepoFile(null)} />
+              )}
             </div>
+          )}
+          {showRepoPicker && (form.type === 'PDF' || form.type === 'VIDEO') && (
+            <AssignRepositoryModal
+              selectionMode
+              fileTypeFilter={form.type === 'PDF' ? 'PDF' : 'VIDEO'}
+              onSelect={(f) => { setRepoFile(f); setShowRepoPicker(false) }}
+              onClose={() => setShowRepoPicker(false)}
+            />
           )}
           {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
@@ -1418,4 +1497,457 @@ function formatFileSize(bytes: number) {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+function RepoFilePickerField({
+  repoFile,
+  onPick,
+  onClear,
+}: {
+  repoFile: RepoFile | null
+  onPick: () => void
+  onClear: () => void
+}) {
+  if (repoFile) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+        <FileText size={16} className="shrink-0 text-primary" />
+        <span className="flex-1 truncate text-sm">{repoFile.name}</span>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-muted-foreground hover:text-destructive"
+        >
+          Cambiar
+        </button>
+      </div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="w-full rounded-lg border-2 border-dashed py-3 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+    >
+      Seleccionar del repositorio...
+    </button>
+  )
+}
+
+// ── Resources Tab ───────────────────────────────────────────────────────────
+
+interface ResourcesData {
+  folders: { public_id: string; name: string; description: string | null; file_count: number }[]
+  files: { public_id: string; name: string; file_name: string; file_size: number | null; file_type: string | null }[]
+}
+
+export function ResourcesTab({
+  program,
+  canManage,
+}: {
+  program: TrainingProgram
+  canManage: boolean
+}) {
+  const [data, setData] = useState<ResourcesData>({ folders: [], files: [] })
+  const [loading, setLoading] = useState(true)
+  const [showAssign, setShowAssign] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await api.get<ResourcesData>(
+        `/repository/programs/${program.public_id}/resources`,
+      )
+      setData(res)
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error al cargar recursos', variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [program.public_id])
+
+  async function unassignFolder(folderId: string) {
+    try {
+      await api.delete(`/repository/programs/${program.public_id}/folders/${folderId}`)
+      toast({ title: 'Carpeta desasignada', variant: 'success' })
+      load()
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error', variant: 'destructive' })
+    }
+  }
+
+  async function unassignFile(fileId: string) {
+    try {
+      await api.delete(`/repository/programs/${program.public_id}/files/${fileId}`)
+      toast({ title: 'Archivo desasignado', variant: 'success' })
+      load()
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error', variant: 'destructive' })
+    }
+  }
+
+  async function downloadFile(fileId: string) {
+    try {
+      const res = await api.get<{ url: string; file_name: string }>(
+        `/repository/files/${fileId}/download`,
+      )
+      window.open(res.url, '_blank')
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error', variant: 'destructive' })
+    }
+  }
+
+  if (loading) {
+    return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>
+  }
+
+  const empty = data.folders.length === 0 && data.files.length === 0
+
+  return (
+    <div className="p-6 space-y-6">
+      {canManage && (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => setShowAssign(true)}>
+            <Plus size={14} className="mr-1" /> Asignar del repositorio
+          </Button>
+        </div>
+      )}
+
+      {empty && (
+        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          No hay recursos asignados a este programa.
+        </p>
+      )}
+
+      {data.folders.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold">Carpetas</h4>
+          {data.folders.map((folder) => (
+            <div
+              key={folder.public_id}
+              className="group flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30"
+            >
+              <Folder size={18} className="shrink-0 text-yellow-500" />
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-medium">{folder.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {folder.file_count} archivo{folder.file_count === 1 ? '' : 's'}
+                </p>
+              </div>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => unassignFolder(folder.public_id)}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                  aria-label="Desasignar carpeta"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.files.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold">Archivos individuales</h4>
+          {data.files.map((file) => (
+            <div
+              key={file.public_id}
+              className="group flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30"
+            >
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded ${getFileColor(file.file_name)}`}
+              >
+                <FileText size={12} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-medium">{file.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{file.file_name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => downloadFile(file.public_id)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Descargar"
+              >
+                <Download size={16} />
+              </button>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => unassignFile(file.public_id)}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                  aria-label="Desasignar archivo"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAssign && (
+        <AssignRepositoryModal
+          programId={program.public_id}
+          onClose={() => setShowAssign(false)}
+          onAssigned={() => load()}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Assign Repository Modal ─────────────────────────────────────────────────
+
+interface RepoFolder {
+  public_id: string
+  name: string
+  description?: string | null
+  file_count?: number
+}
+
+interface RepoFile {
+  public_id: string
+  name: string
+  file_name: string
+  file_size?: number | null
+  file_type?: string | null
+}
+
+interface AssignRepositoryModalProps {
+  programId?: string
+  onClose: () => void
+  onAssigned?: () => void
+  selectionMode?: boolean
+  fileTypeFilter?: 'PDF' | 'VIDEO'
+  onSelect?: (file: RepoFile) => void
+}
+
+const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'avi', 'mkv']
+
+export function AssignRepositoryModal({
+  programId,
+  onClose,
+  onAssigned,
+  selectionMode = false,
+  fileTypeFilter,
+  onSelect,
+}: AssignRepositoryModalProps) {
+  const [contents, setContents] = useState<{ subfolders: RepoFolder[]; files: RepoFile[] }>({
+    subfolders: [],
+    files: [],
+  })
+  const [breadcrumb, setBreadcrumb] = useState<RepoFolder[]>([])
+  const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  async function loadRoot() {
+    setLoading(true)
+    try {
+      const data = await api.get<RepoFolder[]>('/repository/folders')
+      setContents({ subfolders: data, files: [] })
+      setBreadcrumb([])
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error al cargar', variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function openFolder(folder: RepoFolder) {
+    setLoading(true)
+    try {
+      const data = await api.get<{
+        subfolders: RepoFolder[]
+        files: RepoFile[]
+        breadcrumb: RepoFolder[]
+      }>(`/repository/folders/${folder.public_id}`)
+      setContents({ subfolders: data.subfolders, files: data.files })
+      setBreadcrumb(data.breadcrumb)
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error', variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadRoot()
+  }, [])
+
+  async function assignFolder(folder: RepoFolder) {
+    if (!programId) return
+    setBusy(true)
+    try {
+      await api.post(`/repository/programs/${programId}/assign-folder`, {
+        folder_id: folder.public_id,
+      })
+      toast({ title: `Carpeta "${folder.name}" asignada`, variant: 'success' })
+      onAssigned?.()
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error al asignar', variant: 'destructive' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function assignFile(file: RepoFile) {
+    if (!programId) return
+    setBusy(true)
+    try {
+      await api.post(`/repository/programs/${programId}/assign-file`, {
+        file_id: file.public_id,
+      })
+      toast({ title: `Archivo "${file.name}" asignado`, variant: 'success' })
+      onAssigned?.()
+    } catch (err: any) {
+      toast({ title: err?.detail ?? 'Error al asignar', variant: 'destructive' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function fileMatchesFilter(file: RepoFile): boolean {
+    if (!fileTypeFilter) return true
+    const ext = (file.file_type ?? file.file_name.split('.').pop() ?? '').toLowerCase()
+    if (fileTypeFilter === 'PDF') return ext === 'pdf'
+    return VIDEO_EXTS.includes(ext)
+  }
+
+  const visibleFiles = contents.files.filter(fileMatchesFilter)
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4">
+      <div className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b p-6">
+          <h2 className="font-semibold">
+            {selectionMode ? 'Seleccionar del repositorio' : 'Asignar del repositorio'}
+          </h2>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 border-b px-6 py-3 text-sm">
+          <button
+            type="button"
+            onClick={loadRoot}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Repositorio
+          </button>
+          {breadcrumb.map((crumb, i) => (
+            <span key={crumb.public_id} className="flex items-center gap-1">
+              <ChevronRight size={14} className="text-muted-foreground" />
+              <button
+                type="button"
+                onClick={() => openFolder(crumb)}
+                className={
+                  i === breadcrumb.length - 1
+                    ? 'font-medium'
+                    : 'text-muted-foreground hover:text-foreground'
+                }
+              >
+                {crumb.name}
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <div className="flex-1 space-y-2 overflow-y-auto p-6">
+          {loading && (
+            <p className="py-8 text-center text-sm text-muted-foreground">Cargando…</p>
+          )}
+
+          {!loading &&
+            contents.subfolders.map((folder) => (
+              <div
+                key={folder.public_id}
+                className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30"
+              >
+                <Folder size={18} className="shrink-0 text-yellow-500" />
+                <button
+                  type="button"
+                  onClick={() => openFolder(folder)}
+                  className="flex-1 truncate text-left text-sm font-medium"
+                >
+                  {folder.name}
+                </button>
+                {!selectionMode && (
+                  <button
+                    type="button"
+                    onClick={() => assignFolder(folder)}
+                    disabled={busy}
+                    className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs text-white hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    <Plus size={12} /> Asignar carpeta
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => openFolder(folder)}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted"
+                  aria-label="Abrir"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            ))}
+
+          {!loading &&
+            visibleFiles.map((file) => (
+              <div
+                key={file.public_id}
+                className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30"
+              >
+                <div
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded ${getFileColor(file.file_name)}`}
+                >
+                  <FileText size={12} className="text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{file.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{file.file_name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => (selectionMode ? onSelect?.(file) : assignFile(file))}
+                  disabled={busy}
+                  className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs text-white hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <Plus size={12} /> {selectionMode ? 'Seleccionar' : 'Asignar'}
+                </button>
+              </div>
+            ))}
+
+          {!loading &&
+            contents.subfolders.length === 0 &&
+            visibleFiles.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {fileTypeFilter
+                  ? `No hay archivos compatibles con ${fileTypeFilter} en esta carpeta.`
+                  : 'Carpeta vacía'}
+              </p>
+            )}
+        </div>
+
+        <div className="border-t p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-lg border py-2 text-sm hover:bg-muted"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

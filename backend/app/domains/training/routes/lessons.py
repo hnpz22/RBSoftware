@@ -84,6 +84,42 @@ async def create_lesson(
     return LessonRead.model_validate(lesson)
 
 
+class LessonFromRepositoryBody(BaseModel):
+    title: str
+    type: str
+    file_id: str
+    duration_minutes: int | None = None
+
+
+@router.post(
+    "/modules/{module_id}/lessons/from-repository",
+    response_model=LessonRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_lesson_from_repository(
+    module_id: UUID,
+    body: LessonFromRepositoryBody,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
+):
+    data = LessonCreate(
+        title=body.title,
+        type=body.type,
+        duration_minutes=body.duration_minutes,
+    )
+    try:
+        lesson = _svc.create_lesson_from_repository(
+            session, module_id, data, body.file_id, current_user.id
+        )
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    return LessonRead.model_validate(lesson)
+
+
 @router.patch("/lessons/{lesson_id}", response_model=LessonRead)
 def update_lesson(
     lesson_id: UUID,
