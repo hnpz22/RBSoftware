@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes.health import router as health_router
 from app.domains.audit.routes import audit_router
-from app.domains.auth.routes import auth_router, users_router
+from app.domains.auth.routes import auth_router, sso_router, users_router
 from app.domains.catalog.routes import catalog_router
 from app.domains.commercial.routes import commercial_router
 from app.domains.fulfillment.routes import fulfillment_router
@@ -35,6 +35,7 @@ from app.domains.repository.routes.repository import router as repository_router
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(auth_router)
+api_router.include_router(sso_router)
 api_router.include_router(users_router)
 api_router.include_router(roles_router)
 api_router.include_router(permissions_router)
