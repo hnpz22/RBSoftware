@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import type { User } from '@/lib/types'
 
-export default function SSOPage() {
+function SSOContent() {
   const router = useRouter()
   const params = useSearchParams()
   const setUser = useAuthStore((s) => s.setUser)
@@ -51,5 +51,13 @@ export default function SSOPage() {
         <p className="text-sm text-muted-foreground">Iniciando sesión…</p>
       </div>
     </div>
+  )
+}
+
+export default function SSOPage() {
+  return (
+    <Suspense>
+      <SSOContent />
+    </Suspense>
   )
 }
