@@ -39,11 +39,9 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('access_token')
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
-  // Not authenticated → login
+  // Not authenticated → portal (con ?next=lms para auto-redirect tras login)
   if (!token && !isPublic) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect('https://app.miel-robotschool.com?next=lms')
   }
 
   // Already authenticated → skip login page
