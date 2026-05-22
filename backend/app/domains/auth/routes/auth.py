@@ -6,6 +6,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlmodel import Session
 
+from app.core.config import settings
 from app.core.database import get_session
 from app.core.security import create_access_token
 from app.domains.audit.services import AuditService
@@ -33,14 +34,21 @@ class LoginRequest(BaseModel):
 def _set_auth_cookies(
     response: Response, access_token: str, refresh_token: str, role_names: list[str],
 ) -> None:
-    response.set_cookie(key=_ACCESS_COOKIE, value=access_token, httponly=True, samesite="lax")
-    response.set_cookie(key=_REFRESH_COOKIE, value=refresh_token, httponly=True, samesite="lax")
+    # secure=True en produccion (HTTPS); en desarrollo local se sirve por HTTP.
+    secure = settings.environment != "development"
+    response.set_cookie(
+        key=_ACCESS_COOKIE, value=access_token, httponly=True, samesite="lax", secure=secure,
+    )
+    response.set_cookie(
+        key=_REFRESH_COOKIE, value=refresh_token, httponly=True, samesite="lax", secure=secure,
+    )
     response.set_cookie(
         key=_ROLES_COOKIE,
         value=json.dumps(role_names),
         httponly=False,
         samesite="lax",
         path="/",
+        secure=secure,
     )
 
 
