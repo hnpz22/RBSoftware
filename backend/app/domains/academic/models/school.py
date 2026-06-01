@@ -1,9 +1,16 @@
 from datetime import datetime, timezone
+from enum import Enum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, DateTime, String, Text, func
+from sqlalchemy import Column, DateTime, Enum as SAEnum, String, Text, func
 from sqlalchemy.types import Uuid
 from sqlmodel import Field, SQLModel
+
+
+class WorkLine(str, Enum):
+    kuntur = "kuntur"
+    ecua = "ecua"
+    robotschool = "robotschool"
 
 
 class School(SQLModel, table=True):
@@ -25,6 +32,10 @@ class School(SQLModel, table=True):
     )
     contact_phone: str | None = Field(
         default=None, sa_column=Column(String(30), nullable=True)
+    )
+    work_line: WorkLine | None = Field(
+        default=None,
+        sa_column=Column(SAEnum(WorkLine, values_callable=lambda x: [e.value for e in x]), nullable=True),
     )
     is_active: bool = Field(default=True, nullable=False)
     created_at: datetime = Field(

@@ -5,7 +5,13 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import * as academicService from '@/services/academic'
-import type { School } from '@/lib/types'
+import type { School, WorkLine } from '@/lib/types'
+
+const WORK_LINE_OPTIONS: { value: WorkLine; label: string }[] = [
+  { value: 'kuntur', label: 'Kuntur' },
+  { value: 'ecua', label: 'Ecua' },
+  { value: 'robotschool', label: 'RobotSchool' },
+]
 
 interface Props {
   school: School
@@ -21,6 +27,7 @@ export function EditSchoolModal({ school, onClose, onSaved }: Props) {
     contact_name: school.contact_name ?? '',
     contact_email: school.contact_email ?? '',
     contact_phone: school.contact_phone ?? '',
+    work_line: school.work_line ?? ('' as WorkLine | ''),
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +44,7 @@ export function EditSchoolModal({ school, onClose, onSaved }: Props) {
         contact_name: form.contact_name.trim() || null,
         contact_email: form.contact_email.trim() || null,
         contact_phone: form.contact_phone.trim() || null,
+        work_line: form.work_line || null,
       })
       onSaved(updated)
     } catch (err: any) {
@@ -111,6 +119,21 @@ export function EditSchoolModal({ school, onClose, onSaved }: Props) {
                 setForm({ ...form, contact_phone: e.target.value })
               }
             />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Línea de trabajo</label>
+            <select
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={form.work_line}
+              onChange={(e) =>
+                setForm({ ...form, work_line: e.target.value as WorkLine | '' })
+              }
+            >
+              <option value="">— Sin asignar —</option>
+              {WORK_LINE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
