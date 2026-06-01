@@ -6,6 +6,8 @@ from uuid import UUID
 from pydantic import ConfigDict
 from sqlmodel import SQLModel
 
+from app.domains.academic.models.school import WorkLine
+
 
 class SchoolCreate(SQLModel):
     name: str
@@ -14,6 +16,7 @@ class SchoolCreate(SQLModel):
     contact_name: str | None = None
     contact_email: str | None = None
     contact_phone: str | None = None
+    work_line: WorkLine | None = None
     is_active: bool = True
 
 
@@ -27,6 +30,7 @@ class SchoolRead(SQLModel):
     contact_name: str | None
     contact_email: str | None
     contact_phone: str | None
+    work_line: WorkLine | None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -39,4 +43,5 @@ class SchoolUpdate(SQLModel):
     contact_name: str | None = None
     contact_email: str | None = None
     contact_phone: str | None = None
+    work_line: WorkLine | None = None
     is_active: bool | None = None

@@ -214,6 +214,8 @@ export interface ApiError {
 
 // ── Academic ─────────────────────────────────────────────────────────────────
 
+export type WorkLine = 'kuntur' | 'ecua' | 'robotschool'
+
 export interface School {
   public_id: string
   name: string
@@ -222,6 +224,7 @@ export interface School {
   contact_name: string | null
   contact_email: string | null
   contact_phone: string | null
+  work_line: WorkLine | null
   is_active: boolean
   created_at: string
   updated_at: string
