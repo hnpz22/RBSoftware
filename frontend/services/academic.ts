@@ -32,6 +32,7 @@ export function createSchool(data: {
   contact_name?: string | null
   contact_email?: string | null
   contact_phone?: string | null
+  work_line?: string | null
 }) {
   return api.post<School>('/academic/schools', data)
 }
@@ -45,6 +46,7 @@ export function updateSchool(
     contact_name: string | null
     contact_email: string | null
     contact_phone: string | null
+    work_line: string | null
   }>,
 ) {
   return api.patch<School>(`/academic/schools/${id}`, data)
