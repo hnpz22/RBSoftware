@@ -973,7 +973,7 @@ function FolderCard({
       <button onClick={onOpen} className="flex flex-col items-start gap-2 text-left">
         <div className="flex items-center gap-2">
           <Folder className="h-8 w-8 text-amber-400" />
-          {folder.shares.length === 0 && <Lock className="h-3 w-3 text-gray-300" title="Privada" />}
+          {folder.shares.length === 0 && <Lock className="h-3 w-3 text-gray-300" />}
         </div>
         <span className="line-clamp-2 text-sm font-medium text-gray-800">{folder.name}</span>
         <span className="text-xs text-gray-400">
