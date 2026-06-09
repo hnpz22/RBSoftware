@@ -34,6 +34,14 @@ services:
       robotschool:
         aliases: [rbsoftware-mysql]
 
+  # ⚠️ MinIO DEDICADO — en revisión. Decisión de infra (Nicolás): el LMS NO debe
+  # tener MinIO propio; es un bucket dentro del CONSOLIDADO (robotschool_minio).
+  # El backend ya apunta al consolidado (MINIO_ENDPOINT=minio-rbs:9000) y sus
+  # datos fueron espejados allí (09-jun-2026). Este contenedor queda sin uso por
+  # el LMS; pendiente repurposarlo como MinIO de BACKUP o retirarlo (lado Nico).
+  # Nota: al ser service `minio`, Compose le añade el alias de red `minio`, que
+  # colisiona con el del consolidado → round-robin. Por eso el backend usa
+  # `minio-rbs`, no `minio`.
   minio:
     image: minio/minio:latest
     container_name: rbsoftware-minio
@@ -59,6 +67,15 @@ services:
     cpus: 1.0
     env_file:
       - ./backend/.env
+    environment:
+      # El LMS usa el MinIO CONSOLIDADO (robotschool_minio) via su alias UNICO
+      # `minio-rbs`. NO usar `minio:9000`: ese alias lo registran DOS contenedores
+      # (consolidado + el dedicado de abajo) en la misma red, asi que hace
+      # round-robin y parte los multipart uploads -> NoSuchUpload / 500 en
+      # archivos grandes. `minio-rbs` resuelve solo al consolidado y no lleva
+      # guion bajo (Host valido para la firma SigV4 de las URLs prefirmadas).
+      # Override explicito sobre backend/.env. Ver daily Tomas 2026-06-09.
+      - MINIO_ENDPOINT=minio-rbs:9000
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     depends_on:
       mysql:
