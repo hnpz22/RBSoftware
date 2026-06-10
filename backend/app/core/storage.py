@@ -57,6 +57,26 @@ class StorageService:
         )
         return url
 
+    def generate_presigned_put_url(self, key: str, expires_seconds: int = 3600) -> str:
+        url = self.client.presigned_put_object(
+            self.bucket,
+            key,
+            expires=timedelta(seconds=expires_seconds),
+        )
+        url = url.replace(
+            f"http://{settings.minio_endpoint}",
+            f"{settings.minio_public_scheme}://{settings.minio_public_endpoint}/storage",
+            1,
+        )
+        return url
+
+    def file_exists(self, key: str) -> bool:
+        try:
+            self.client.stat_object(self.bucket, key)
+            return True
+        except S3Error:
+            return False
+
     def delete_file(self, key: str) -> None:
         try:
             self.client.remove_object(self.bucket, key)

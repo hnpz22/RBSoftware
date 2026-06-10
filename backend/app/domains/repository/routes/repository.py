@@ -76,6 +76,23 @@ class FileRead(BaseModel):
     uploaded_by_name: str | None
     created_at: datetime
 
+class PresignRequest(BaseModel):
+    file_name: str
+    folder_id: str | None = None
+
+class PresignResponse(BaseModel):
+    upload_url: str
+    key: str
+
+class FileComplete(BaseModel):
+    name: str
+    description: str | None = None
+    folder_id: str | None = None
+    file_name: str
+    file_size: int
+    content_type: str
+    key: str
+
 class BreadcrumbItem(BaseModel):
     public_id: str
     name: str
@@ -456,6 +473,62 @@ async def upload_file(
         file_key=key,
         file_name=file.filename or key.split("/")[-1],
         file_size=len(file_bytes),
+        file_type=ext.lstrip(".") or None,
+        uploaded_by=current_user.id,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(repo_file)
+    session.commit()
+    session.refresh(repo_file)
+    return _file_read(repo_file, session)
+
+
+@router.post("/files/presign", response_model=PresignResponse)
+def presign_upload(
+    body: PresignRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
+):
+    ext = os.path.splitext(body.file_name)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Extensión no permitida: {ext}. Permitidas: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+    folder_segment = "root"
+    if body.folder_id:
+        folder = _get_folder(session, body.folder_id)
+        folder_segment = folder.public_id
+
+    key = f"repository/{folder_segment}/{uuid_module.uuid4()}{ext}"
+    upload_url = storage_service.generate_presigned_put_url(key, expires_seconds=3600)
+    return PresignResponse(upload_url=upload_url, key=key)
+
+
+@router.post("/files/complete", response_model=FileRead, status_code=status.HTTP_201_CREATED)
+def complete_upload(
+    body: FileComplete,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles("ADMIN", "TRAINER", "SUPER_TRAINER")),
+):
+    if not storage_service.file_exists(body.key):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "El archivo no se subió correctamente a MinIO")
+
+    folder_db_id = None
+    if body.folder_id:
+        folder = _get_folder(session, body.folder_id)
+        folder_db_id = folder.id
+
+    ext = os.path.splitext(body.file_name)[1].lower()
+    now = datetime.now(timezone.utc)
+    repo_file = RepositoryFile(
+        folder_id=folder_db_id,
+        name=body.name,
+        description=body.description,
+        file_key=body.key,
+        file_name=body.file_name,
+        file_size=body.file_size,
         file_type=ext.lstrip(".") or None,
         uploaded_by=current_user.id,
         created_at=now,

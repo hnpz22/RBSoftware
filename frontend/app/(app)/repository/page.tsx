@@ -337,17 +337,36 @@ export default function RepositoryPage() {
     }
   }
 
-  // Upload file
+  // Upload file — presigned PUT directo a MinIO
   const handleUpload = async () => {
     if (!uploadFile || !uploadName.trim()) return
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append('file', uploadFile)
-      formData.append('name', uploadName.trim())
-      if (uploadDesc.trim()) formData.append('description', uploadDesc.trim())
-      if (activeFolderId) formData.append('folder_id', activeFolderId)
-      await api.postForm('/repository/files', formData)
+      // 1. Pedir URL prefirmada al backend
+      const { upload_url, key } = await api.post<{ upload_url: string; key: string }>(
+        '/repository/files/presign',
+        { file_name: uploadFile.name, folder_id: activeFolderId ?? null },
+      )
+
+      // 2. Subir el archivo directo a MinIO (sin pasar por el backend)
+      const putRes = await fetch(upload_url, {
+        method: 'PUT',
+        body: uploadFile,
+        headers: { 'Content-Type': uploadFile.type || 'application/octet-stream' },
+      })
+      if (!putRes.ok) throw new Error(`PUT MinIO ${putRes.status}`)
+
+      // 3. Registrar el archivo en base de datos
+      await api.post('/repository/files/complete', {
+        name: uploadName.trim(),
+        description: uploadDesc.trim() || null,
+        folder_id: activeFolderId ?? null,
+        file_name: uploadFile.name,
+        file_size: uploadFile.size,
+        content_type: uploadFile.type || 'application/octet-stream',
+        key,
+      })
+
       toast({ title: 'Archivo subido', variant: 'success' })
       setShowUpload(false)
       setUploadFile(null)
