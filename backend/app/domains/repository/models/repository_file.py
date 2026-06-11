@@ -11,6 +11,8 @@ class RepositoryFile(SQLModel, table=True):
     __tablename__ = "repository_files"
 
     id: int | None = Field(default=None, primary_key=True)
+    # String(36) intencional — migrar a Uuid requeriría migración de datos en prod.
+    # Comparar contra str, NO contra uuid.UUID (usaría .hex y lanzaría AttributeError).
     public_id: str = Field(
         default_factory=lambda: str(uuid4()),
         sa_column=Column(String(36), unique=True, nullable=False),

@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlmodel import Session, select
 
+from app.core.identifiers import parse_public_id
 from app.core.storage import storage_service
 from app.domains.repository.models.repository_file import RepositoryFile
 from app.domains.audit.services import AuditService
@@ -258,7 +259,7 @@ class TrainingService:
             if public_id is None:
                 evaluation.after_lesson_id = None
             else:
-                lesson = LessonRepository(session).get_by_public_id(UUID(public_id))
+                lesson = LessonRepository(session).get_by_public_id(parse_public_id(public_id, detail="ID de lección inválido"))
                 if lesson is None:
                     raise LookupError("Lección no encontrada")
                 if lesson.module_id != evaluation.module_id:

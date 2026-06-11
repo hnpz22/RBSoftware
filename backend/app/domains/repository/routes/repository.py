@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, or_, select
 
 from app.core.database import get_session
+from app.core.identifiers import parse_public_id
 from app.core.permissions import require_roles
 from app.core.storage import storage_service
 from app.domains.academic.models.school import School, WorkLine
@@ -392,10 +393,7 @@ def create_folder_share(
     else:  # school
         if not data.school_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Falta school_id")
-        try:
-            school_uuid = uuid_module.UUID(data.school_id)
-        except (ValueError, TypeError):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "school_id inválido")
+        school_uuid = parse_public_id(data.school_id, detail="school_id inválido")
         school = session.exec(
             select(School).where(School.public_id == school_uuid)
         ).first()
@@ -628,10 +626,7 @@ class AssignFileRequest(BaseModel):
 
 def _get_program_or_404(session: Session, program_public_id: str):
     from app.domains.training.models.training_program import TrainingProgram
-    try:
-        program_uuid = uuid_module.UUID(program_public_id)
-    except ValueError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Programa no encontrado")
+    program_uuid = parse_public_id(program_public_id, detail="Identificador de programa inválido")
     program = session.exec(
         select(TrainingProgram).where(TrainingProgram.public_id == program_uuid)
     ).first()

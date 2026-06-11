@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
+from app.core.identifiers import parse_public_id
 from app.core.security import hash_password, verify_password
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
@@ -111,11 +112,8 @@ class UserService:
         from app.domains.rbac.models.role import Role
         from app.domains.rbac.models.user_role import UserRole
 
-        try:
-            school_uuid = UUID(school_public_id)
-            course_uuid = UUID(course_public_id)
-        except (ValueError, TypeError):
-            raise ValueError("school_id o course_id inválido")
+        school_uuid = parse_public_id(school_public_id, detail="school_id inválido")
+        course_uuid = parse_public_id(course_public_id, detail="course_id inválido")
 
         school = session.exec(
             select(School).where(School.public_id == school_uuid)
