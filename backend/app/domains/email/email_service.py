@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+import httpx
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.config import settings
@@ -14,27 +14,34 @@ _jinja_env = Environment(
     autoescape=select_autoescape(["html", "xml"]),
 )
 
+_TOKEN_URL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+_SENDMAIL_URL = "https://graph.microsoft.com/v1.0/users/{sender}/sendMail"
+
 
 class EmailService:
-    """Envío de emails transaccionales del LMS.
+    """Envío de emails transaccionales del LMS vía Microsoft Graph API.
 
-    En entornos sin SMTP configurado (``settings.smtp_user`` vacío), no se intenta
-    enviar nada: el email se loguea en consola para inspección durante desarrollo.
+    Usa el flujo *client credentials* (app-only): obtiene un token con el
+    ``graph_client_secret`` y envía el correo como ``graph_sender`` mediante
+    el endpoint ``/users/{sender}/sendMail``.
+
+    En entornos sin Graph configurado (``settings.graph_client_secret`` vacío),
+    no se intenta enviar nada: el email se loguea en consola para inspección
+    durante desarrollo.
     """
 
-    def _connection_config(self) -> ConnectionConfig:
-        return ConnectionConfig(
-            MAIL_USERNAME=settings.smtp_user,
-            MAIL_PASSWORD=settings.smtp_password,
-            MAIL_FROM=settings.smtp_from_email,
-            MAIL_FROM_NAME=settings.smtp_from_name,
-            MAIL_PORT=settings.smtp_port,
-            MAIL_SERVER=settings.smtp_host,
-            MAIL_STARTTLS=True,
-            MAIL_SSL_TLS=False,
-            USE_CREDENTIALS=True,
-            VALIDATE_CERTS=True,
-        )
+    async def _get_token(self) -> str:
+        url = _TOKEN_URL.format(tenant=settings.graph_tenant_id)
+        data = {
+            "client_id": settings.graph_client_id,
+            "client_secret": settings.graph_client_secret,
+            "scope": "https://graph.microsoft.com/.default",
+            "grant_type": "client_credentials",
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(url, data=data)
+            resp.raise_for_status()
+            return resp.json()["access_token"]
 
     async def send_credentials(
         self,
@@ -51,9 +58,9 @@ class EmailService:
         )
         subject = "Tus credenciales de acceso a RobotSchool LMS"
 
-        if not settings.smtp_user:
+        if not settings.graph_client_secret:
             _log.warning(
-                "[EmailService] SMTP no configurado (modo dev). Email NO enviado.\n"
+                "[EmailService] Graph no configurado (modo dev). Email NO enviado.\n"
                 "  Para: %s\n  Asunto: %s\n  Link de contraseña: %s",
                 to_email,
                 subject,
@@ -61,12 +68,27 @@ class EmailService:
             )
             return
 
-        message = MessageSchema(
-            subject=subject,
-            recipients=[to_email],
-            body=html_body,
-            subtype=MessageType.html,
-        )
-        fast_mail = FastMail(self._connection_config())
-        await fast_mail.send_message(message)
-        _log.info("[EmailService] Credenciales enviadas a %s", to_email)
+        token = await self._get_token()
+        payload = {
+            "message": {
+                "subject": subject,
+                "body": {"contentType": "HTML", "content": html_body},
+                "from": {
+                    "emailAddress": {
+                        "address": settings.graph_sender,
+                        "name": settings.graph_from_name,
+                    }
+                },
+                "toRecipients": [{"emailAddress": {"address": to_email}}],
+            },
+            "saveToSentItems": False,
+        }
+        url = _SENDMAIL_URL.format(sender=settings.graph_sender)
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                url,
+                json=payload,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            resp.raise_for_status()
+        _log.info("[EmailService] Credenciales enviadas a %s vía Graph", to_email)
