@@ -19,9 +19,6 @@ from sqlmodel import Session, create_engine, select
 from app.core.config import settings
 from app.domains.auth.models import User
 from app.domains.auth.services.user_service import UserService
-from app.domains.inventory.models.stock_location import LocationType, StockLocation
-from app.domains.inventory.schemas.location import LocationCreate
-from app.domains.inventory.services.inventory_service import InventoryService
 from app.domains.rbac.models import Role, UserRole
 from app.domains.rbac.repositories import RoleRepository, UserRoleRepository
 from app.domains.rbac.schemas import RoleCreate, UserRoleCreate
@@ -143,25 +140,6 @@ def seed_user_roles(session: Session) -> None:
             continue
         ur_repo.create(UserRoleCreate(user_id=user.id, role_id=role.id))
         print(f"  [ok]   '{email}' → '{role_name}'")
-
-
-# ── Ubicaciones ───────────────────────────────────────────────────────────────
-
-def seed_locations(session: Session) -> None:
-    locations = [
-        LocationCreate(name="Bodega Principal", type=LocationType.WAREHOUSE),
-        LocationCreate(name="Sede Bogotá",       type=LocationType.SEDE),
-        LocationCreate(name="Sede 2",            type=LocationType.SEDE),
-        LocationCreate(name="Sede 3",            type=LocationType.SEDE),
-    ]
-    svc = InventoryService()
-    for loc in locations:
-        existing = session.exec(select(StockLocation).where(StockLocation.name == loc.name)).first()
-        if existing:
-            print(f"  [skip] ubicación '{loc.name}' ya existe")
-        else:
-            svc.create_location(session, loc)
-            print(f"  [ok]   ubicación '{loc.name}' creada")
 
 
 # ── Académico ─────────────────────────────────────────────────────────────────
@@ -609,9 +587,6 @@ def main() -> None:
 
         print("\n→ Usuarios:")
         seed_users(session)
-
-        print("\n→ Ubicaciones de stock:")
-        seed_locations(session)
 
         print("\n→ Académico:")
         seed_academic(session)

@@ -16,28 +16,13 @@ from app.core.security import hash_password
 # Import all models so SQLModel.metadata knows about every table before create_all
 from app.domains.audit.models import AuditLog  # noqa: F401
 from app.domains.auth.models import RefreshToken, User  # noqa: F401
-from app.domains.catalog.models import KitBomItem, Product  # noqa: F401
-from app.domains.commercial.models import SalesOrder, SalesOrderItem  # noqa: F401
-from app.domains.production.models import (  # noqa: F401
-    ProductionBatch,
-    ProductionBatchItem,
-    ProductionBatchSalesOrder,
-    ProductionBlock,
-    ProductionItemCounter,
-)
-from app.domains.inventory.models import (  # noqa: F401
-    ComponentInventoryBalance,
-    ComponentInventoryMovement,
-    InventoryBalance,
-    InventoryMovement,
-    StockLocation,
-)
-from app.domains.integrations.models import IntegrationSyncState  # noqa: F401
-from app.domains.fulfillment.models import (  # noqa: F401
-    SalesOrderPackEvent,
-    SalesOrderPackItem,
-)
 from app.domains.rbac.models import Permission, Role, RolePermission, UserRole  # noqa: F401
+# repository tiene __init__ vacío en models/ → importar cada clase explícitamente
+from app.domains.repository.models.repository_folder import RepositoryFolder  # noqa: F401
+from app.domains.repository.models.repository_file import RepositoryFile  # noqa: F401
+from app.domains.repository.models.program_repository_folder import ProgramRepositoryFolder  # noqa: F401
+from app.domains.repository.models.program_repository_file import ProgramRepositoryFile  # noqa: F401
+from app.domains.repository.models.repository_folder_share import RepositoryFolderShare  # noqa: F401
 from app.main import app
 
 
