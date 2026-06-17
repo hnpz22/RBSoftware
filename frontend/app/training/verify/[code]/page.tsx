@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CheckCircle2, XCircle } from 'lucide-react'
+import { OwlLogo } from '@/components/OwlLogo'
 
 interface VerifyResult {
   valid: boolean
@@ -45,9 +46,7 @@ export default function VerifyCertificatePage() {
       <div className="w-full max-w-md">
         {/* Logo header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--plat-accent)]">
-            <span className="text-xl font-black text-white">RS</span>
-          </div>
+          <OwlLogo className="mx-auto h-12 w-auto" />
           <h1 className="mt-3 text-xl font-bold text-gray-900">ROBOTSchool</h1>
           <p className="text-sm text-gray-500">Verificación de certificado</p>
         </div>
