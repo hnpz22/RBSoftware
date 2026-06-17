@@ -45,7 +45,7 @@ export default function VerifyCertificatePage() {
       <div className="w-full max-w-md">
         {/* Logo header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#1A237E]">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--plat-accent)]">
             <span className="text-xl font-black text-white">RS</span>
           </div>
           <h1 className="mt-3 text-xl font-bold text-gray-900">ROBOTSchool</h1>
@@ -127,8 +127,8 @@ export default function VerifyCertificatePage() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-md bg-[#1A237E]/5 px-4 py-3 text-center">
-              <p className="text-xs text-[#1A237E]">
+            <div className="mt-6 rounded-md bg-primary/5 px-4 py-3 text-center">
+              <p className="text-xs text-primary">
                 Este certificado fue emitido por{' '}
                 <span className="font-semibold">ROBOTSchool Colombia</span>
               </p>

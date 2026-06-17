@@ -78,12 +78,12 @@ async function generateBadge(cert: CertificateEnriched) {
       canvas.width = 400
       canvas.height = 400
 
-      ctx.fillStyle = '#1A237E'
+      ctx.fillStyle = '#00E5FF'
       ctx.beginPath()
       ctx.arc(200, 200, 190, 0, Math.PI * 2)
       ctx.fill()
 
-      ctx.fillStyle = '#FF6F00'
+      ctx.fillStyle = '#2563EB'
       ctx.beginPath()
       ctx.arc(200, 200, 160, 0, Math.PI * 2)
       ctx.fill()
@@ -109,7 +109,7 @@ async function generateBadge(cert: CertificateEnriched) {
       ctx.fillText(cert.certificate_code, 200, 300)
     }
   } catch {
-    ctx.fillStyle = '#1A237E'
+    ctx.fillStyle = '#2563EB'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.fillStyle = '#FFFFFF'
     ctx.font = 'bold 24px Arial'
@@ -204,8 +204,8 @@ export default function CertificatesPage() {
           <div key={c.public_id} className="rounded-lg border bg-card p-5 space-y-4">
             {/* Badge preview */}
             <div className="flex justify-center">
-              <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-[#FF6F00]"
-                style={{ boxShadow: '0 0 0 12px #1A237E' }}
+              <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-[var(--plat-accent)]"
+                style={{ boxShadow: '0 0 0 12px var(--plat-accent-neon)' }}
               >
                 <div className="text-center">
                   <p className="text-2xl font-black text-white">RS</p>

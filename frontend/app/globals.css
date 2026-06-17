@@ -2,56 +2,82 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ════════════════════════════════════════════════════════════════════════
+   LMS · Alineado al RBS Design System (tema "lms")
+   Fuente canónica: Design/design-system/css/tokens.css (v2.0, 2026-05-19)
+   Identidad LMS: Azul Royal #2563EB + neón cian #00E5FF · Sora + Inter.
+
+   Estos tokens shadcn (--primary, --ring, …) se REMAPEAN a la paleta
+   canónica del LMS. Los componentes siguen usando bg-primary/text-primary,
+   por eso migran sin tocarse. Los --plat- y --rbs- exponen la marca para
+   sidebar, login y hero. NO hardcodear hex en componentes.
+   ════════════════════════════════════════════════════════════════════════ */
+
 :root {
+  /* ─── Tokens de marca canónicos (tema lms) ─── */
+  --font-display: var(--font-sora), 'Sora', system-ui, -apple-system, sans-serif;
+
+  --plat-accent:        #2563EB;   /* azul royal — acción principal */
+  --plat-accent-dark:   #1D4ED8;
+  --plat-accent-light:  #dbeafe;
+  --plat-accent-neon:   #00E5FF;   /* neón cian — SOLO hero/login/logros */
+  --plat-bg:            #060c1a;    /* fondo oscuro hero */
+  --plat-sidebar:       #0d1626;    /* superficie sidebar (siempre oscuro) */
+
+  --rbs-red:   #E8302A;            /* destructivo / errores */
+  --rbs-teal:  #009CCC;            /* marca universal */
+
+  /* ─── Tokens shadcn → paleta LMS (light) ─── */
   /* Base */
   --background: 220 20% 97%;
-  --foreground: 213 60% 10%;
+  --foreground: 224 71% 12%;
 
   /* Card */
   --card: 0 0% 100%;
-  --card-foreground: 213 60% 10%;
+  --card-foreground: 224 71% 12%;
 
   /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 213 60% 10%;
+  --popover-foreground: 224 71% 12%;
 
-  /* Primary — Azul navy RobotSchool */
-  --primary: 231 64% 29%;
+  /* Primary — Azul Royal RobotSchool LMS (#2563EB) */
+  --primary: 221 83% 53%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary */
-  --secondary: 220 14% 93%;
-  --secondary-foreground: 231 64% 29%;
+  /* Secondary — superficie azul sutil (#dbeafe) */
+  --secondary: 214 95% 93%;
+  --secondary-foreground: 224 71% 30%;
 
-  /* Muted */
+  /* Muted — neutro */
   --muted: 220 14% 93%;
   --muted-foreground: 215 16% 47%;
 
-  /* Accent — Naranja RobotSchool */
-  --accent: 33 100% 50%;
-  --accent-foreground: 0 0% 100%;
+  /* Accent — superficie azul de hover/selección (shadcn) */
+  --accent: 214 95% 93%;
+  --accent-foreground: 224 71% 30%;
 
-  /* Destructive */
-  --destructive: 0 72% 51%;
+  /* Destructive — rbs-red (#E8302A) */
+  --destructive: 2 81% 54%;
   --destructive-foreground: 0 0% 100%;
 
   /* Border e Input */
   --border: 220 13% 88%;
   --input: 220 13% 88%;
 
-  /* Ring */
-  --ring: 231 64% 29%;
+  /* Ring — azul royal */
+  --ring: 221 83% 53%;
 
   /* Border radius */
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: 222 47% 8%;
+  /* Fondos alineados a --plat-bg / --plat-sidebar canónicos */
+  --background: 220 60% 6%;
   --foreground: 210 40% 96%;
-  --card: 222 47% 11%;
+  --card: 220 48% 10%;
   --card-foreground: 210 40% 96%;
-  --popover: 222 47% 11%;
+  --popover: 220 48% 10%;
   --popover-foreground: 210 40% 96%;
   --primary: 221 83% 60%;
   --primary-foreground: 0 0% 100%;
@@ -59,9 +85,9 @@
   --secondary-foreground: 210 40% 96%;
   --muted: 217 33% 15%;
   --muted-foreground: 215 20% 65%;
-  --accent: 33 100% 50%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 72% 51%;
+  --accent: 217 33% 18%;
+  --accent-foreground: 210 40% 96%;
+  --destructive: 2 81% 54%;
   --destructive-foreground: 0 0% 100%;
   --border: 217 33% 20%;
   --input: 217 33% 20%;
@@ -78,9 +104,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Display = Sora (canónico). Body = Inter. */
 h1, h2, h3, h4 {
+  font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+}
+
+/* Neón sutil — SOLO hero/login/logros (no sidebar/listados). */
+.neon-glow {
+  filter: drop-shadow(0 0 6px var(--plat-accent-neon));
+}
+.neon-text {
+  color: var(--plat-accent-neon);
+  text-shadow: 0 0 4px var(--plat-accent-neon);
 }
 
 .pdf-highlighter-wrapper [class*="_container_"] {

@@ -178,9 +178,9 @@ function ConnStatsSection({ title }: { title: string }) {
                 <Line
                   type="monotone"
                   dataKey="logins"
-                  stroke="#1A237E"
+                  stroke="#2563EB"
                   strokeWidth={2}
-                  dot={{ fill: '#FF6F00', strokeWidth: 2, r: 4 }}
+                  dot={{ fill: '#009CCC', strokeWidth: 2, r: 4 }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>
@@ -211,7 +211,7 @@ function ConnStatsSection({ title }: { title: string }) {
                       h === 0 ? '12:00 am' : h < 12 ? `${h}:00 am` : h === 12 ? '12:00 pm' : `${h - 12}:00 pm`
                     }
                   />
-                  <Bar dataKey="logins" fill="#1A237E" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="logins" fill="#2563EB" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

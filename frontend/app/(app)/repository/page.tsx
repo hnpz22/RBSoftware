@@ -558,7 +558,7 @@ export default function RepositoryPage() {
               <Button
                 size="sm"
                 onClick={() => setShowUpload(true)}
-                className="gap-1 bg-[#1A237E] hover:bg-[#283593]"
+                className="gap-1 bg-primary hover:bg-primary/90"
               >
                 <Upload className="h-4 w-4" />
                 Subir archivo
@@ -733,7 +733,7 @@ export default function RepositoryPage() {
                 size="sm"
                 onClick={handleCreateFolder}
                 disabled={creatingFolder || !newFolderName.trim()}
-                className="bg-[#1A237E] hover:bg-[#283593]"
+                className="bg-primary hover:bg-primary/90"
               >
                 {creatingFolder ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Crear'}
               </Button>
@@ -790,7 +790,7 @@ export default function RepositoryPage() {
                 size="sm"
                 onClick={handleUpload}
                 disabled={uploading || !uploadFile || !uploadName.trim()}
-                className="bg-[#1A237E] hover:bg-[#283593]"
+                className="bg-primary hover:bg-primary/90"
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Subir'}
               </Button>
@@ -963,7 +963,7 @@ function AddShareForm({
           size="sm"
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="bg-[#1A237E] hover:bg-[#283593]"
+          className="bg-primary hover:bg-primary/90"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Agregar acceso'}
         </Button>

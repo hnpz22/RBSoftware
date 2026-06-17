@@ -19,7 +19,7 @@ const badgeVariants = cva(
         teacher: 'border border-blue-200 bg-blue-100 text-blue-800',
         director: 'border border-purple-200 bg-purple-100 text-purple-800',
         student: 'border border-green-200 bg-green-100 text-green-800',
-        admin: 'border border-[#FF6F00]/20 bg-[#FF6F00]/10 text-[#FF6F00]',
+        admin: 'border border-amber-200 bg-amber-100 text-amber-800',
       },
     },
     defaultVariants: { variant: 'default' },

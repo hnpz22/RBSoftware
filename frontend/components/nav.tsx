@@ -117,7 +117,7 @@ export function Nav() {
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex flex-col bg-[#1A237E] transition-all duration-200',
+        'fixed inset-y-0 left-0 z-50 flex flex-col bg-[var(--plat-sidebar)] transition-all duration-200',
         open ? 'translate-x-0' : '-translate-x-full',
         'md:translate-x-0',
         collapsed ? 'w-56 md:w-16' : 'w-56',
@@ -126,12 +126,12 @@ export function Nav() {
       {/* Logo */}
       <div className="flex h-16 items-center border-b border-white/10 px-4">
         <div className={cn('flex items-center gap-3', collapsed && 'md:justify-center md:w-full')}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6F00] to-[#FF8F00] shadow-lg shadow-[#FF6F00]/30">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--plat-accent)] to-[var(--plat-accent-neon)] shadow-lg">
             <Bot size={20} className="text-white" />
           </div>
           <div className={cn('flex flex-col', collapsed && 'md:hidden')}>
             <span className="text-sm font-bold leading-tight text-white">RBSoftware</span>
-            <span className="text-xs font-medium leading-tight text-[#FF6F00]">by ROBOTSchool</span>
+            <span className="neon-text text-xs font-medium leading-tight">by ROBOTSchool</span>
           </div>
         </div>
       </div>
@@ -185,7 +185,7 @@ export function Nav() {
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                     active
-                      ? 'bg-[#FF6F00] font-medium text-white shadow-lg shadow-[#FF6F00]/30'
+                      ? 'bg-[var(--plat-accent)] font-medium text-white shadow-lg'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                     collapsed && 'md:justify-center md:px-0',
                   )}
@@ -193,7 +193,7 @@ export function Nav() {
                 >
                   <Icon
                     size={16}
-                    className={active ? 'text-white' : 'text-[#FF6F00]'}
+                    className={active ? 'text-white' : 'text-white/60'}
                   />
                   <span className={cn(collapsed && 'md:hidden')}>
                     {label}
@@ -215,7 +215,7 @@ export function Nav() {
             )}
           >
             <div className="relative shrink-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#FF6F00] bg-gradient-to-br from-[#FF6F00] to-[#FF8F00] text-sm font-bold text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--plat-accent)] bg-gradient-to-br from-[var(--plat-accent)] to-[var(--plat-accent-neon)] text-sm font-bold text-white">
                 {initials}
               </div>
               <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-400 shadow-lg shadow-green-400/50" />

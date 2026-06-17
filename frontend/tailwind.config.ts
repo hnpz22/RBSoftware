@@ -11,8 +11,11 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-sora)', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Neón cian de marca (tema lms) — solo hero/login/logros.
+        neon: "var(--plat-accent-neon)",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
