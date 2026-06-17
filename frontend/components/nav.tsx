@@ -7,7 +7,6 @@ import {
   Award,
   BookOpen,
   BookOpenCheck,
-  Bot,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +21,7 @@ import {
   Users2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { OwlLogo } from '@/components/OwlLogo'
 import { api } from '@/lib/api'
 import { useAuthStore, useSidebarStore, useThemeStore } from '@/lib/store'
 
@@ -126,9 +126,7 @@ export function Nav() {
       {/* Logo */}
       <div className="flex h-16 items-center border-b border-border px-4">
         <div className={cn('flex items-center gap-3', collapsed && 'md:justify-center md:w-full')}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--plat-accent)] to-[var(--plat-accent-neon)] shadow-lg">
-            <Bot size={20} className="text-white" />
-          </div>
+          <OwlLogo className="h-8 w-auto shrink-0" />
           <div className={cn('flex flex-col', collapsed && 'md:hidden')}>
             <span className="text-sm font-bold leading-tight text-foreground">RBSoftware</span>
             <span className="text-xs font-medium leading-tight text-primary">by ROBOTSchool</span>

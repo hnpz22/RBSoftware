@@ -1,0 +1,35 @@
+// Isotipo búho de ROBOTSchool — SVG inline para poder controlar color por CSS.
+// Cuerpo y pico usan las CSS vars de la plataforma (globals.css), de modo que
+// el logo sigue el theme del LMS sin colores hardcodeados.
+// Asset canónico: Design/design-system/assets/logo-owl.svg (viewBox 0 0 1722 1141).
+
+interface OwlLogoProps {
+  className?: string
+  title?: string
+}
+
+export function OwlLogo({ className, title = 'ROBOTSchool' }: OwlLogoProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 1722 1141"
+      role="img"
+      aria-label={title}
+      className={className}
+    >
+      <title>{title}</title>
+      <g fill="var(--plat-accent)">
+        <path d="M203.061 315.993C119.632 235.427 117.312 102.483 197.878 19.0539L216.277 0.00132998L778.066 542.514C865.467 626.917 867.898 766.192 783.495 853.594L772.043 865.453L203.061 315.993Z" />
+        <path d="M1518.26 315.993C1601.69 235.427 1604.01 102.483 1523.44 19.0539L1505.04 0.00132998L943.255 542.514C855.853 626.917 853.422 766.192 937.825 853.594L949.277 865.453L1518.26 315.993Z" />
+        <circle cx="389" cy="700.002" r="110" />
+        <circle cx="1332" cy="700.002" r="110" />
+        <path d="M1564.23 377.891C1660 450.374 1722 566.107 1722 696.505C1722 916.038 1546.27 1094 1329.5 1094C1189.14 1094 1066 1019.39 996.613 907.2L1151.87 762.422C1178.85 835.165 1248.87 887.005 1331 887.005C1436.49 887.005 1522 801.491 1522 696.005C1522 618.595 1475.95 551.941 1409.75 521.943L1564.23 377.891Z" />
+        <path d="M157.771 377.889C61.9991 450.372 0 566.104 0 696.502C0 916.035 175.728 1094 392.5 1094C532.856 1094 656.004 1019.39 725.387 907.197L570.132 762.42C543.15 835.163 473.13 887.002 391 887.002C285.514 887.002 200 801.488 200 696.002C200 618.593 246.05 551.939 312.25 521.941L157.771 377.889Z" />
+      </g>
+      <path
+        fill="var(--plat-accent-neon)"
+        d="M990 895.002C990 1019.03 945.444 1100.23 862.467 1140.07L860.5 1141C776.26 1101.5 731 1020 731 895.002H990Z"
+      />
+    </svg>
+  )
+}
