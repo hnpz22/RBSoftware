@@ -5,7 +5,7 @@ import { Download, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import type { CourseRead, Grade, Role, School, User } from '@/lib/types'
+import type { Grade, Role, School, User } from '@/lib/types'
 
 // ── Create user modal ─────────────────────────────────────────────────────────
 
@@ -805,10 +805,15 @@ function UserPanel({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 type ImportResult = {
+  aborted: boolean
   created: string[]
+  reused: string[]
+  enrolled: string[]
   errors: { row: number; email: string; error: string }[]
-  total: number
-  success_count: number
+  total_rows: number
+  created_count: number
+  reused_count: number
+  enrolled_count: number
   error_count: number
 }
 
@@ -823,10 +828,7 @@ export default function SettingsUsersPage() {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [importSchools, setImportSchools] = useState<School[]>([])
-  const [importGrades, setImportGrades] = useState<Grade[]>([])
-  const [importCourses, setImportCourses] = useState<(CourseRead & { label: string })[]>([])
   const [selectedSchool, setSelectedSchool] = useState('')
-  const [selectedCourse, setSelectedCourse] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -836,35 +838,11 @@ export default function SettingsUsersPage() {
       .catch(() => {})
   }, [showImport])
 
-  useEffect(() => {
-    if (!selectedSchool) {
-      setImportGrades([])
-      setImportCourses([])
-      setSelectedCourse('')
-      return
-    }
-    api.get<Grade[]>(`/academic/schools/${selectedSchool}/grades`)
-      .then(async (grades) => {
-        setImportGrades(grades)
-        const allCourses: (CourseRead & { label: string })[] = []
-        for (const grade of grades) {
-          const courses = await api.get<CourseRead[]>(
-            `/academic/grades/${grade.public_id}/courses`
-          )
-          courses.forEach((c) => {
-            allCourses.push({ ...c, label: `${grade.name} — ${c.name}` })
-          })
-        }
-        setImportCourses(allCourses)
-      })
-      .catch(() => {})
-  }, [selectedSchool])
-
   function downloadTemplate() {
     const rows = [
-      'nombre,apellido,email,password,telefono',
-      'Juan,Pérez,juan@email.com,Estudiante123!,3001234567',
-      'Ana,López,ana@email.com,Estudiante123!,3009876543',
+      'grupo;nombre;apellido;email',
+      'SEGUNDO;Juan;Pérez;juan.perez@robotschool.com',
+      'TERCERO B;Ana;López;ana.lopez@robotschool.com',
     ]
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -876,13 +854,13 @@ export default function SettingsUsersPage() {
   }
 
   async function handleImport() {
-    if (!importFile || !selectedSchool || !selectedCourse) return
+    if (!importFile || !selectedSchool) return
     setImporting(true)
+    setImportError(null)
     try {
       const formData = new FormData()
       formData.append('file', importFile)
       formData.append('school_id', selectedSchool)
-      formData.append('course_id', selectedCourse)
       const result = await api.postForm<ImportResult>(
         '/auth/users/import-csv',
         formData,
@@ -947,10 +925,15 @@ export default function SettingsUsersPage() {
                     <p className="font-medium">Instrucciones:</p>
                     <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
                       <li>Descarga la plantilla CSV</li>
-                      <li>Completa los datos de los estudiantes</li>
-                      <li>Selecciona el colegio y el curso</li>
+                      <li>Completa una fila por estudiante</li>
+                      <li>Selecciona el colegio</li>
                       <li>Sube el archivo y clic en Importar</li>
                     </ol>
+                    <p className="text-muted-foreground">
+                      Formato: <code className="rounded bg-background px-1 py-0.5 text-xs">grupo;nombre;apellido;email</code>.
+                      El curso de cada estudiante se resuelve por su <strong>grupo</strong> (ej. <code className="rounded bg-background px-1 py-0.5 text-xs">SEGUNDO B</code>).
+                      Reimportar es seguro: no se duplican estudiantes ya matriculados.
+                    </p>
                     <button
                       onClick={downloadTemplate}
                       className="flex items-center gap-2 text-primary hover:underline text-sm font-medium mt-2"
@@ -966,7 +949,7 @@ export default function SettingsUsersPage() {
                     </label>
                     <select
                       value={selectedSchool}
-                      onChange={(e) => { setSelectedSchool(e.target.value); setSelectedCourse('') }}
+                      onChange={(e) => setSelectedSchool(e.target.value)}
                       className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
                     >
                       <option value="">Seleccionar colegio...</option>
@@ -977,24 +960,6 @@ export default function SettingsUsersPage() {
                   </div>
 
                   {selectedSchool && (
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">
-                        Curso<span className="text-destructive ml-1">*</span>
-                      </label>
-                      <select
-                        value={selectedCourse}
-                        onChange={(e) => setSelectedCourse(e.target.value)}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">Seleccionar curso...</option>
-                        {importCourses.map((c) => (
-                          <option key={c.public_id} value={c.public_id}>{c.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {selectedCourse && (
                     <div className="space-y-1">
                       <label className="text-sm font-medium">
                         Archivo CSV<span className="text-destructive ml-1">*</span>
@@ -1018,23 +983,41 @@ export default function SettingsUsersPage() {
                 </>
               ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg bg-green-500/10 p-4 text-center">
-                      <p className="text-3xl font-bold text-green-600">{importResult.success_count}</p>
-                      <p className="text-xs text-green-600 mt-1">Creados exitosamente</p>
+                  {importResult.aborted ? (
+                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-sm">
+                      <p className="font-medium text-amber-700 dark:text-amber-500">
+                        No se importó nada
+                      </p>
+                      <p className="text-muted-foreground mt-1">
+                        El archivo tiene {importResult.error_count}{' '}
+                        {importResult.error_count === 1 ? 'fila con problema' : 'filas con problemas'}.
+                        Para no matricular a nadie en el grupo equivocado, la importación es
+                        todo-o-nada: corrige las filas de abajo y vuelve a subir el archivo.
+                      </p>
                     </div>
-                    <div className="rounded-lg bg-destructive/10 p-4 text-center">
-                      <p className="text-3xl font-bold text-destructive">{importResult.error_count}</p>
-                      <p className="text-xs text-destructive mt-1">Con errores</p>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-lg bg-green-500/10 p-4 text-center">
+                        <p className="text-3xl font-bold text-green-600">{importResult.created_count}</p>
+                        <p className="text-xs text-green-600 mt-1">Creados</p>
+                      </div>
+                      <div className="rounded-lg bg-blue-500/10 p-4 text-center">
+                        <p className="text-3xl font-bold text-blue-600">{importResult.reused_count}</p>
+                        <p className="text-xs text-blue-600 mt-1">Reutilizados</p>
+                      </div>
+                      <div className="rounded-lg bg-primary/10 p-4 text-center">
+                        <p className="text-3xl font-bold text-primary">{importResult.enrolled_count}</p>
+                        <p className="text-xs text-primary mt-1">Matriculados</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {importResult.errors.length > 0 && (
                     <div className="rounded-lg border border-destructive/20 overflow-hidden">
                       <div className="bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-                        Detalle de errores
+                        Filas a corregir
                       </div>
-                      <div className="max-h-48 overflow-y-auto divide-y">
+                      <div className="max-h-60 overflow-y-auto divide-y">
                         {importResult.errors.map((err, i) => (
                           <div key={i} className="px-3 py-2 text-xs flex flex-col gap-0.5">
                             <span className="font-medium">Fila {err.row}: {err.email}</span>
@@ -1062,7 +1045,6 @@ export default function SettingsUsersPage() {
                     setImportResult(null)
                     setImportFile(null)
                     setSelectedSchool('')
-                    setSelectedCourse('')
                     setImportError(null)
                     load()
                   }}
@@ -1080,7 +1062,7 @@ export default function SettingsUsersPage() {
                   </button>
                   <button
                     onClick={handleImport}
-                    disabled={!importFile || !selectedSchool || !selectedCourse || importing}
+                    disabled={!importFile || !selectedSchool || importing}
                     className="px-4 py-2 rounded-lg bg-primary text-white font-medium text-sm disabled:opacity-50"
                   >
                     {importing ? 'Importando...' : 'Importar'}
@@ -1111,7 +1093,6 @@ export default function SettingsUsersPage() {
                   setImportFile(null)
                   setImportResult(null)
                   setSelectedSchool('')
-                  setSelectedCourse('')
                   setImportError(null)
                 }}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted text-sm"
