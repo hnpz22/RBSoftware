@@ -13,6 +13,19 @@ from app.domains.rbac.repositories import UserRoleRepository
 from app.domains.auth.services.refresh_token_service import RefreshTokenService
 
 
+def _normalize_group(name: str) -> str:
+    """Normaliza un nombre de grupo/curso para matching robusto pero exacto.
+
+    Mayúsculas, sin tildes, espacios colapsados y recortados. NO hace fuzzy:
+    meter a un estudiante en el grupo equivocado es peor que no meterlo.
+    """
+    import unicodedata
+
+    stripped = unicodedata.normalize("NFKD", name or "")
+    stripped = "".join(c for c in stripped if not unicodedata.combining(c))
+    return " ".join(stripped.upper().split())
+
+
 class UserService:
     def register(
         self,
@@ -96,11 +109,27 @@ class UserService:
         session: Session,
         csv_bytes: bytes,
         school_public_id: str,
-        course_public_id: str,
         requesting_user_id: int,
     ) -> dict:
+        """Importa estudiantes desde un CSV `grupo;nombre;apellido;email`.
+
+        El curso de cada estudiante se resuelve por el nombre de su `grupo`
+        (normalizado) dentro del colegio. Validación todo-o-nada: si alguna
+        fila tiene un problema (grupo no reconocido, campo vacío, email mal
+        formado o duplicado dentro del CSV), no se escribe nada y se devuelve
+        el reporte completo para corregir y reimportar.
+
+        Idempotente: dedup de usuario por email (el SSO también matchea por
+        email), `enroll` reactiva matrículas soft-deleted y la membresía al
+        colegio es no-op si ya existe. Reimportar el CSV corregido es seguro.
+        Los estudiantes entran por SSO; el password se autogenera y es
+        irrelevante.
+        """
         import csv
         import io
+        import secrets
+        from difflib import get_close_matches
+
         from sqlmodel import select
 
         from app.domains.academic.models.lms_course import LmsCourse
@@ -113,7 +142,6 @@ class UserService:
         from app.domains.rbac.models.user_role import UserRole
 
         school_uuid = parse_public_id(school_public_id, detail="school_id inválido")
-        course_uuid = parse_public_id(course_public_id, detail="course_id inválido")
 
         school = session.exec(
             select(School).where(School.public_id == school_uuid)
@@ -121,26 +149,17 @@ class UserService:
         if not school:
             raise LookupError("Colegio no encontrado")
 
-        course = session.exec(
+        # Índice de cursos activos del colegio por nombre normalizado.
+        courses = session.exec(
             select(LmsCourse).where(
-                LmsCourse.public_id == course_uuid,
+                LmsCourse.school_id == school.id,
                 LmsCourse.is_active == True,  # noqa: E712
             )
-        ).first()
-        if not course:
-            raise LookupError("Curso no encontrado")
+        ).all()
+        course_by_group = {_normalize_group(c.name): c for c in courses}
+        group_keys = list(course_by_group.keys())
 
-        if course.school_id != school.id:
-            raise ValueError("El curso no pertenece a ese colegio")
-
-        student_role = session.exec(
-            select(Role).where(Role.name == "STUDENT")
-        ).first()
-
-        user_repo = UserRepository(session)
-        course_student_repo = CourseStudentRepository(session)
-        academic_svc = AcademicService()
-
+        # ── Parseo y decodificación ──────────────────────────────────────────
         try:
             content = csv_bytes.decode("utf-8-sig")
         except UnicodeDecodeError:
@@ -158,82 +177,152 @@ class UserService:
         except Exception:
             raise ValueError("El archivo no es un CSV válido")
 
-        required = {"nombre", "apellido", "email", "password"}
-        headers = set(reader.fieldnames or [])
+        required = {"grupo", "nombre", "apellido", "email"}
+        headers = {(h or "").strip().lower() for h in (reader.fieldnames or [])}
         missing = required - headers
         if missing:
-            raise ValueError(f"Faltan columnas: {', '.join(missing)}")
+            raise ValueError(f"Faltan columnas: {', '.join(sorted(missing))}")
 
-        results: dict = {"created": [], "errors": []}
+        # ── Validación previa todo-o-nada ────────────────────────────────────
+        # Recolecta TODOS los problemas antes de escribir. Si hay alguno,
+        # aborta sin tocar la BD.
+        errors: list[dict] = []
+        valid_rows: list[dict] = []
+        seen_emails: set[str] = set()
 
         for i, row in enumerate(reader, start=2):
-            email = row.get("email", "").strip().lower()
-            nombre = row.get("nombre", "").strip()
-            apellido = row.get("apellido", "").strip()
-            password = row.get("password", "").strip()
-            telefono = row.get("telefono", "").strip() or None
+            grupo_raw = (row.get("grupo") or "").strip()
+            nombre = (row.get("nombre") or "").strip()
+            apellido = (row.get("apellido") or "").strip()
+            email = (row.get("email") or "").strip().lower()
 
-            if not email:
-                results["errors"].append(
-                    {"row": i, "email": "-", "error": "Email vacío"}
-                )
-                continue
-
-            if not nombre or not apellido:
-                results["errors"].append(
-                    {"row": i, "email": email, "error": "Nombre o apellido vacío"}
-                )
-                continue
-
-            if len(password) < 8:
-                results["errors"].append(
+            if not grupo_raw or not nombre or not apellido or not email:
+                errors.append(
                     {
                         "row": i,
-                        "email": email,
-                        "error": "Password debe tener mínimo 8 caracteres",
+                        "email": email or "-",
+                        "error": "Fila incompleta (grupo, nombre, apellido y email son obligatorios)",
                     }
                 )
                 continue
 
-            if user_repo.get_by_email(email):
-                results["errors"].append(
-                    {"row": i, "email": email, "error": "Email ya existe en el sistema"}
+            if "@" not in email or "." not in email.split("@")[-1]:
+                errors.append(
+                    {"row": i, "email": email, "error": "Email con formato inválido"}
                 )
                 continue
 
-            try:
-                new_user = user_repo.create(
+            if email in seen_emails:
+                errors.append(
+                    {"row": i, "email": email, "error": "Email duplicado dentro del archivo"}
+                )
+                continue
+            seen_emails.add(email)
+
+            grupo_key = _normalize_group(grupo_raw)
+            course = course_by_group.get(grupo_key)
+            if course is None:
+                suggestion = get_close_matches(grupo_key, group_keys, n=1, cutoff=0.6)
+                hint = ""
+                if suggestion:
+                    nombre_sugerido = course_by_group[suggestion[0]].name
+                    hint = f' — ¿quisiste decir "{nombre_sugerido}"?'
+                errors.append(
+                    {
+                        "row": i,
+                        "email": email,
+                        "error": f'Grupo "{grupo_raw}" no existe en el colegio{hint}',
+                    }
+                )
+                continue
+
+            valid_rows.append(
+                {
+                    "email": email,
+                    "nombre": nombre,
+                    "apellido": apellido,
+                    "course": course,
+                }
+            )
+
+        if errors:
+            # Todo-o-nada: no se escribió nada.
+            return {
+                "aborted": True,
+                "created": [],
+                "reused": [],
+                "enrolled": [],
+                "errors": errors,
+                "total_rows": len(valid_rows) + len(errors),
+                "created_count": 0,
+                "reused_count": 0,
+                "enrolled_count": 0,
+                "error_count": len(errors),
+            }
+
+        # ── Escritura (solo si todo validó) ──────────────────────────────────
+        student_role = session.exec(
+            select(Role).where(Role.name == "STUDENT")
+        ).first()
+
+        user_repo = UserRepository(session)
+        course_student_repo = CourseStudentRepository(session)
+        academic_svc = AcademicService()
+
+        created: list[str] = []
+        reused: list[str] = []
+        enrolled: list[str] = []
+
+        for entry in valid_rows:
+            email = entry["email"]
+            course = entry["course"]
+
+            user = user_repo.get_by_email(email)
+            if user is None:
+                # Password autogenerado: el estudiante entra por SSO.
+                user = user_repo.create(
                     UserCreate(
                         email=email,
-                        password_hash=hash_password(password),
-                        first_name=nombre,
-                        last_name=apellido,
-                        phone=telefono,
+                        password_hash=hash_password(secrets.token_urlsafe(32)),
+                        first_name=entry["nombre"],
+                        last_name=entry["apellido"],
+                        phone=None,
                         position=None,
                         is_active=True,
                     )
                 )
+                created.append(email)
+            else:
+                reused.append(email)
 
-                if student_role:
-                    session.add(
-                        UserRole(user_id=new_user.id, role_id=student_role.id)
+            # Asegurar rol STUDENT sin duplicar.
+            if student_role:
+                has_role = session.exec(
+                    select(UserRole).where(
+                        UserRole.user_id == user.id,
+                        UserRole.role_id == student_role.id,
                     )
+                ).first()
+                if has_role is None:
+                    session.add(UserRole(user_id=user.id, role_id=student_role.id))
                     session.commit()
 
-                academic_svc.add_member_to_school(
-                    session, school.id, new_user.id, requesting_user_id
-                )
+            # Membresía al colegio (no-op si ya existe) + matrícula idempotente.
+            academic_svc.add_member_to_school(
+                session, school.id, user.id, requesting_user_id
+            )
+            course_student_repo.enroll(course.id, user.id)
+            enrolled.append(email)
 
-                course_student_repo.enroll(course.id, new_user.id)
-
-                results["created"].append(email)
-            except Exception as exc:
-                session.rollback()
-                results["errors"].append(
-                    {"row": i, "email": email, "error": str(exc)}
-                )
-
-        results["total"] = len(results["created"]) + len(results["errors"])
-        results["success_count"] = len(results["created"])
-        results["error_count"] = len(results["errors"])
-        return results
+        return {
+            "aborted": False,
+            "created": created,
+            "reused": reused,
+            "enrolled": enrolled,
+            "errors": [],
+            "total_rows": len(valid_rows),
+            "created_count": len(created),
+            "reused_count": len(reused),
+            "enrolled_count": len(enrolled),
+            "error_count": 0,
+        }

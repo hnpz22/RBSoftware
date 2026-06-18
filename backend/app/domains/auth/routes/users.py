@@ -286,7 +286,6 @@ def change_password(
 def import_students_csv(
     file: UploadFile = File(...),
     school_id: str = Form(...),
-    course_id: str = Form(...),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -309,7 +308,6 @@ def import_students_csv(
             session,
             csv_bytes=csv_bytes,
             school_public_id=school_id,
-            course_public_id=course_id,
             requesting_user_id=current_user.id,
         )
     except LookupError as exc:
