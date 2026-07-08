@@ -16,6 +16,7 @@ from app.domains.academic.models.school import School, WorkLine
 from app.domains.auth.dependencies import get_current_user
 from app.domains.auth.models import User
 from app.domains.repository.models.repository_file import RepositoryFile
+from app.domains.repository.models.repository_file_share import RepositoryFileShare
 from app.domains.repository.models.repository_folder import RepositoryFolder
 from app.domains.repository.models.repository_folder_share import (
     RepositoryFolderShare,
@@ -76,6 +77,7 @@ class FileRead(BaseModel):
     file_type: str | None
     uploaded_by_name: str | None
     created_at: datetime
+    shares: list[ShareRead] = []
 
 class PresignRequest(BaseModel):
     file_name: str
@@ -124,7 +126,9 @@ def _parent_public_id(parent_id: int | None, session: Session) -> str | None:
     parent = session.get(RepositoryFolder, parent_id)
     return parent.public_id if parent else None
 
-def _share_read(share: RepositoryFolderShare, session: Session) -> ShareRead:
+def _share_read(
+    share: RepositoryFolderShare | RepositoryFileShare, session: Session
+) -> ShareRead:
     school_public_id = None
     school_name = None
     if share.school_id is not None:
@@ -147,6 +151,14 @@ def _folder_own_shares(folder_id: int, session: Session) -> list[RepositoryFolde
             select(RepositoryFolderShare).where(
                 RepositoryFolderShare.folder_id == folder_id
             )
+        ).all()
+    )
+
+
+def _file_own_shares(file_id: int, session: Session) -> list[RepositoryFileShare]:
+    return list(
+        session.exec(
+            select(RepositoryFileShare).where(RepositoryFileShare.file_id == file_id)
         ).all()
     )
 
@@ -186,6 +198,7 @@ def _file_read(f: RepositoryFile, session: Session) -> FileRead:
         file_type=f.file_type,
         uploaded_by_name=_user_name(f.uploaded_by, session),
         created_at=f.created_at,
+        shares=[_share_read(s, session) for s in _file_own_shares(f.id, session)],
     )
 
 def _get_folder(session: Session, public_id: str) -> RepositoryFolder:
@@ -256,6 +269,9 @@ def get_folder(
     visible_subfolders = [
         sf for sf in subfolders if can_see_folder(session, sf, current_user, scopes)
     ]
+    visible_files = [
+        f for f in files if can_see_file(session, f, current_user, scopes)
+    ]
     return FolderDetail(
         public_id=folder.public_id,
         name=folder.name,
@@ -263,7 +279,7 @@ def get_folder(
         parent_id=_parent_public_id(folder.parent_id, session),
         breadcrumb=_breadcrumb(folder, session),
         subfolders=[_folder_read(sf, session) for sf in visible_subfolders],
-        files=[_file_read(f, session) for f in files],
+        files=[_file_read(f, session) for f in visible_files],
         created_by_name=_user_name(folder.created_by, session),
         created_at=folder.created_at,
         updated_at=folder.updated_at,
@@ -439,6 +455,90 @@ def delete_folder_share(
     session.delete(share)
     session.commit()
 
+
+@router.get("/files/{file_id}/shares", response_model=list[ShareRead])
+def list_file_shares(
+    file_id: str,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles(*MANAGE_SHARE_ROLES)),
+):
+    f = _get_file(session, file_id)
+    return [_share_read(s, session) for s in _file_own_shares(f.id, session)]
+
+
+@router.post("/files/{file_id}/shares", response_model=ShareRead, status_code=status.HTTP_201_CREATED)
+def create_file_share(
+    file_id: str,
+    data: ShareCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(*MANAGE_SHARE_ROLES)),
+):
+    f = _get_file(session, file_id)
+
+    try:
+        scope_type = ShareScopeType(data.scope_type)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "scope_type inválido")
+
+    work_line_val: WorkLine | None = None
+    school_db_id: int | None = None
+
+    if scope_type == ShareScopeType.work_line:
+        if not data.work_line:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Falta work_line")
+        try:
+            work_line_val = WorkLine(data.work_line)
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "work_line inválida")
+    else:  # school
+        if not data.school_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Falta school_id")
+        school_uuid = parse_public_id(data.school_id, detail="school_id inválido")
+        school = session.exec(
+            select(School).where(School.public_id == school_uuid)
+        ).first()
+        if school is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Colegio no encontrado")
+        school_db_id = school.id
+
+    existing = session.exec(
+        select(RepositoryFileShare).where(
+            RepositoryFileShare.file_id == f.id,
+            RepositoryFileShare.scope_type == scope_type,
+            RepositoryFileShare.work_line == work_line_val,
+            RepositoryFileShare.school_id == school_db_id,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta compartición ya existe")
+
+    share = RepositoryFileShare(
+        file_id=f.id,
+        scope_type=scope_type,
+        work_line=work_line_val,
+        school_id=school_db_id,
+        created_by=current_user.id,
+    )
+    session.add(share)
+    session.commit()
+    session.refresh(share)
+    return _share_read(share, session)
+
+
+@router.delete("/files/{file_id}/shares/{share_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_file_share(
+    file_id: str,
+    share_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_roles(*MANAGE_SHARE_ROLES)),
+):
+    f = _get_file(session, file_id)
+    share = session.get(RepositoryFileShare, share_id)
+    if share is None or share.file_id != f.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compartición no encontrada")
+    session.delete(share)
+    session.commit()
+
 # ── Files ─────────────────────────────────────────────────────────────────────
 
 @router.post("/files", response_model=FileRead, status_code=status.HTTP_201_CREATED)
@@ -562,7 +662,7 @@ def download_file(
 ):
     f = _get_file(session, file_id)
     scopes = get_user_scopes(session, current_user)
-    if not can_see_file(session, f.folder_id, f.uploaded_by, current_user, scopes):
+    if not can_see_file(session, f, current_user, scopes):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Archivo no encontrado")
     url = storage_service.generate_presigned_url(f.file_key, expires_seconds=300, inline=False)
     return {"url": url, "file_name": f.file_name}
@@ -576,7 +676,7 @@ def view_file(
 ):
     f = _get_file(session, file_id)
     scopes = get_user_scopes(session, current_user)
-    if not can_see_file(session, f.folder_id, f.uploaded_by, current_user, scopes):
+    if not can_see_file(session, f, current_user, scopes):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Archivo no encontrado")
     url = storage_service.generate_presigned_url(f.file_key, expires_seconds=300, inline=True)
     return {"url": url, "file_name": f.file_name, "file_type": f.file_type}
@@ -604,9 +704,7 @@ def search(
         f for f in folders if can_see_folder(session, f, current_user, scopes)
     ]
     visible_files = [
-        f
-        for f in files
-        if can_see_file(session, f.folder_id, f.uploaded_by, current_user, scopes)
+        f for f in files if can_see_file(session, f, current_user, scopes)
     ]
     return {
         "folders": [_folder_read(f, session) for f in visible_folders],

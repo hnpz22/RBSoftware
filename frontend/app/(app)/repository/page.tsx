@@ -17,7 +17,6 @@ import {
   Loader2,
   Lock,
   Search,
-  Share2,
   Trash2,
   Upload,
   Users,
@@ -84,7 +83,21 @@ interface FileRead {
   file_type: string | null
   uploaded_by_name: string | null
   created_at: string
+  shares: ShareRead[]
 }
+
+// Objetivo de compartición: carpeta o archivo. El modal es el mismo para ambos;
+// solo cambia la ruta base de los endpoints de shares.
+type ShareTarget = {
+  kind: 'folder' | 'file'
+  publicId: string
+  name: string
+}
+
+const shareBasePath = (t: ShareTarget) =>
+  t.kind === 'folder'
+    ? `/repository/folders/${t.publicId}`
+    : `/repository/files/${t.publicId}`
 
 interface BreadcrumbItem {
   public_id: string
@@ -243,7 +256,7 @@ export default function RepositoryPage() {
   const [viewerFileType, setViewerFileType] = useState<'PDF' | 'IMAGE'>('PDF')
 
   // Share modal
-  const [shareFolder, setShareFolder] = useState<FolderRead | null>(null)
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null)
   const [shareList, setShareList] = useState<ShareRead[]>([])
   const [shareOptions, setShareOptions] = useState<ShareOptions | null>(null)
   const [shareLoading, setShareLoading] = useState(false)
@@ -427,22 +440,22 @@ export default function RepositoryPage() {
     }
   }
 
-  // Share: open modal + load options/current shares
-  const handleOpenShare = async (folder: FolderRead) => {
-    setShareFolder(folder)
+  // Share: open modal + load options/current shares (carpeta o archivo)
+  const handleOpenShare = async (target: ShareTarget) => {
+    setShareTarget(target)
     setShareLoading(true)
     try {
       const [opts, shares] = await Promise.all([
         shareOptions
           ? Promise.resolve(shareOptions)
           : api.get<ShareOptions>('/repository/share-options'),
-        api.get<ShareRead[]>(`/repository/folders/${folder.public_id}/shares`),
+        api.get<ShareRead[]>(`${shareBasePath(target)}/shares`),
       ])
       setShareOptions(opts)
       setShareList(shares)
     } catch {
       toast({ title: 'Error al cargar compartición', variant: 'destructive' })
-      setShareFolder(null)
+      setShareTarget(null)
     } finally {
       setShareLoading(false)
     }
@@ -456,13 +469,11 @@ export default function RepositoryPage() {
   const handleAddShare = async (
     payload: { scope_type: 'work_line'; work_line: string } | { scope_type: 'school'; school_id: string },
   ) => {
-    if (!shareFolder) return
+    if (!shareTarget) return
     setShareSaving(true)
     try {
-      await api.post(`/repository/folders/${shareFolder.public_id}/shares`, payload)
-      const shares = await api.get<ShareRead[]>(
-        `/repository/folders/${shareFolder.public_id}/shares`,
-      )
+      await api.post(`${shareBasePath(shareTarget)}/shares`, payload)
+      const shares = await api.get<ShareRead[]>(`${shareBasePath(shareTarget)}/shares`)
       setShareList(shares)
       await refreshAfterShareChange()
     } catch (e: any) {
@@ -474,10 +485,10 @@ export default function RepositoryPage() {
   }
 
   const handleRemoveShare = async (shareId: number) => {
-    if (!shareFolder) return
+    if (!shareTarget) return
     setShareSaving(true)
     try {
-      await api.delete(`/repository/folders/${shareFolder.public_id}/shares/${shareId}`)
+      await api.delete(`${shareBasePath(shareTarget)}/shares/${shareId}`)
       setShareList((prev) => prev.filter((s) => s.id !== shareId))
       await refreshAfterShareChange()
     } catch {
@@ -638,7 +649,11 @@ export default function RepositoryPage() {
                       canManage={canManage}
                       onOpen={() => loadFolder(f.public_id)}
                       onDelete={() => handleDeleteFolder(f.public_id)}
-                      onShare={canManage ? () => handleOpenShare(f) : undefined}
+                      onShare={
+                        canManage
+                          ? () => handleOpenShare({ kind: 'folder', publicId: f.public_id, name: f.name })
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -661,7 +676,11 @@ export default function RepositoryPage() {
                         canManage={canManage}
                         onOpen={() => loadFolder(f.public_id)}
                         onDelete={() => handleDeleteFolder(f.public_id)}
-                        onShare={canManage ? () => handleOpenShare(f) : undefined}
+                        onShare={
+                        canManage
+                          ? () => handleOpenShare({ kind: 'folder', publicId: f.public_id, name: f.name })
+                          : undefined
+                      }
                       />
                     ))}
                   </div>
@@ -685,6 +704,11 @@ export default function RepositoryPage() {
                     onView={() => handleView(file)}
                     onDownload={() => handleDownload(file)}
                     onDelete={() => handleDeleteFile(file.public_id)}
+                    onShare={
+                      canManage
+                        ? () => handleOpenShare({ kind: 'file', publicId: file.public_id, name: file.name })
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -812,16 +836,18 @@ export default function RepositoryPage() {
         localUrl={viewerUrl}
       />
 
-      {/* Share folder modal */}
-      {shareFolder && (
+      {/* Share modal (carpeta o archivo) */}
+      {shareTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-foreground">Compartir carpeta</h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">{shareFolder.name}</p>
+                <h3 className="font-semibold text-foreground">
+                  {shareTarget.kind === 'folder' ? 'Compartir carpeta' : 'Compartir documento'}
+                </h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">{shareTarget.name}</p>
               </div>
-              <button onClick={() => setShareFolder(null)}>
+              <button onClick={() => setShareTarget(null)}>
                 <X className="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
@@ -838,7 +864,9 @@ export default function RepositoryPage() {
                   {shareList.length === 0 ? (
                     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Lock className="h-3.5 w-3.5" />
-                      Privada — solo tú y los administradores la ven.
+                      {shareTarget.kind === 'folder'
+                        ? 'Privada — solo tú y los administradores la ven.'
+                        : 'Sin compartición propia — hereda el acceso de su carpeta.'}
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
@@ -1050,6 +1078,7 @@ function FileRow({
   onView,
   onDownload,
   onDelete,
+  onShare,
 }: {
   file: FileRead
   canManage: boolean
@@ -1057,6 +1086,7 @@ function FileRow({
   onView: () => void
   onDownload: () => void
   onDelete: () => void
+  onShare?: () => void
 }) {
   return (
     <div
@@ -1070,6 +1100,20 @@ function FileRow({
           {file.file_size ? ` · ${formatSize(file.file_size)}` : ''}
           {file.uploaded_by_name ? ` · ${file.uploaded_by_name}` : ''}
         </p>
+        {file.shares.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {file.shares.map((s) => (
+              <span
+                key={s.id}
+                className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+              >
+                {s.scope_type === 'work_line'
+                  ? (WORK_LINE_LABELS[s.work_line ?? ''] ?? s.work_line)
+                  : s.school_name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {isViewable(file.file_type) && (
@@ -1088,6 +1132,15 @@ function FileRow({
         >
           <Download className="h-4 w-4" />
         </button>
+        {canManage && onShare && (
+          <button
+            onClick={onShare}
+            className="rounded p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+            title="Compartir"
+          >
+            <Users className="h-4 w-4" />
+          </button>
+        )}
         {canManage && (
           <button
             onClick={onDelete}

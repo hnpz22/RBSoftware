@@ -27,6 +27,8 @@ from app.domains.academic.models.school import School, WorkLine
 from app.domains.academic.models.school_teacher import SchoolTeacher
 from app.domains.auth.models import User
 from app.domains.rbac.repositories import UserRoleRepository
+from app.domains.repository.models.repository_file import RepositoryFile
+from app.domains.repository.models.repository_file_share import RepositoryFileShare
 from app.domains.repository.models.repository_folder import RepositoryFolder
 from app.domains.repository.models.repository_folder_share import (
     RepositoryFolderShare,
@@ -127,22 +129,15 @@ def folder_effective_shares(
     return []
 
 
-def can_see_folder(
-    session: Session,
-    folder: RepositoryFolder,
-    user: User,
+def _scope_matches(
+    shares: list[RepositoryFolderShare] | list[RepositoryFileShare],
     scopes: UserScopes,
 ) -> bool:
-    """¿Puede `user` (con `scopes` ya calculados) ver esta carpeta?"""
-    if scopes.bypass:
-        return True
-    if folder.created_by is not None and folder.created_by == user.id:
-        return True
+    """¿Alguno de los shares intersecta las líneas/colegios del usuario?
 
-    shares = folder_effective_shares(session, folder)
-    if not shares:
-        return False  # privada y no es el dueño
-
+    Funciona para shares de carpeta o de archivo: ambos exponen
+    `scope_type`, `work_line` y `school_id`.
+    """
     for share in shares:
         if (
             share.scope_type == ShareScopeType.work_line
@@ -159,25 +154,64 @@ def can_see_folder(
     return False
 
 
-def can_see_file(
+def can_see_folder(
     session: Session,
-    file_folder_id: int | None,
-    file_uploaded_by: int | None,
+    folder: RepositoryFolder,
     user: User,
     scopes: UserScopes,
 ) -> bool:
-    """Visibilidad de un archivo: hereda de su carpeta.
+    """¿Puede `user` (con `scopes` ya calculados) ver esta carpeta?"""
+    if scopes.bypass:
+        return True
+    if folder.created_by is not None and folder.created_by == user.id:
+        return True
 
-    Un archivo sin carpeta (raíz, `folder_id=None`) no tiene scope heredable =>
-    visible solo para bypass o para quien lo subió.
+    shares = folder_effective_shares(session, folder)
+    if not shares:
+        return False  # privada y no es el dueño
+
+    return _scope_matches(shares, scopes)
+
+
+def file_own_shares(
+    session: Session, file: RepositoryFile
+) -> list[RepositoryFileShare]:
+    """Shares propios del archivo (sin herencia)."""
+    return list(
+        session.exec(
+            select(RepositoryFileShare).where(RepositoryFileShare.file_id == file.id)
+        ).all()
+    )
+
+
+def can_see_file(
+    session: Session,
+    file: RepositoryFile,
+    user: User,
+    scopes: UserScopes,
+) -> bool:
+    """Visibilidad de un archivo.
+
+    Si el archivo tiene shares propios, esos REEMPLAZAN lo heredado (override):
+    se decide solo por intersección de scope. Si no tiene, hereda la visibilidad
+    de su carpeta vía `can_see_folder` (que incluye la rama del creador de la
+    carpeta). Bypass (ADMIN/SUPER_TRAINER) y quien lo subió lo ven siempre. Un
+    archivo en la raíz (`folder_id=None`) sin shares propios no tiene scope
+    heredable => solo bypass / uploader.
     """
     if scopes.bypass:
         return True
-    if file_uploaded_by is not None and file_uploaded_by == user.id:
+    if file.uploaded_by is not None and file.uploaded_by == user.id:
         return True
-    if file_folder_id is None:
+
+    own = file_own_shares(session, file)
+    if own:
+        return _scope_matches(own, scopes)
+
+    # Sin shares propios: hereda de la carpeta (incl. rama del creador).
+    if file.folder_id is None:
         return False
-    folder = session.get(RepositoryFolder, file_folder_id)
+    folder = session.get(RepositoryFolder, file.folder_id)
     if folder is None:
         return False
     return can_see_folder(session, folder, user, scopes)

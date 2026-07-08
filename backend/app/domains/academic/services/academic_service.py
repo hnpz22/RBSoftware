@@ -704,9 +704,7 @@ class AcademicService:
         # verificación va también aquí: ocultar solo en la UI daría falsa
         # privacidad.
         scopes = get_user_scopes(session, requesting_user)
-        if not can_see_file(
-            session, repo_file.folder_id, repo_file.uploaded_by, requesting_user, scopes
-        ):
+        if not can_see_file(session, repo_file, requesting_user, scopes):
             raise PermissionError("No tienes acceso a este archivo del repositorio")
 
         # Reutiliza el mismo objeto en MinIO (no se duplica el archivo): el
