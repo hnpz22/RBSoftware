@@ -1,11 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Download, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Download, Plus, RefreshCw, Search, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import type { Grade, Role, School, User } from '@/lib/types'
+
+const PAGE_SIZE = 25
+
+/** Valor centinela del filtro: usuarios sin ninguna afiliación activa. */
+const NO_SCHOOL = '__none__'
+
+/** Minúsculas y sin tildes: buscar "jose" debe encontrar a "José". */
+function normalize(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
 
 // ── Create user modal ─────────────────────────────────────────────────────────
 
@@ -830,6 +844,10 @@ export default function SettingsUsersPage() {
   const [importSchools, setImportSchools] = useState<School[]>([])
   const [selectedSchool, setSelectedSchool] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
+  const [schoolFilter, setSchoolFilter] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     if (!showImport) return
@@ -888,6 +906,56 @@ export default function SettingsUsersPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Opciones derivadas de los usuarios cargados, no de /rbac/roles ni
+  // /academic/schools: así ninguna opción del filtro devuelve una lista vacía.
+  const schoolOptions = useMemo(() => {
+    const byId = new Map<string, string>()
+    for (const u of users) {
+      for (const s of u.schools ?? []) byId.set(s.public_id, s.name)
+    }
+    return [...byId].map(([public_id, name]) => ({ public_id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  }, [users])
+
+  const roleOptions = useMemo(
+    () => [...new Set(users.flatMap((u) => u.roles ?? []))].sort((a, b) => a.localeCompare(b)),
+    [users],
+  )
+
+  const filtered = useMemo(() => {
+    const q = normalize(search)
+    return users.filter((u) => {
+      if (q && !normalize(`${u.first_name} ${u.last_name} ${u.email}`).includes(q)) return false
+      if (roleFilter && !(u.roles ?? []).includes(roleFilter)) return false
+      if (schoolFilter) {
+        const schools = u.schools ?? []
+        // NO_SCHOOL cubre a quien no tiene colegio por rol (ADMIN, TRAINER…) y a
+        // quien perdió su única afiliación activa.
+        if (schoolFilter === NO_SCHOOL) {
+          if (schools.length > 0) return false
+        } else if (!schools.some((s) => s.public_id === schoolFilter)) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [users, search, roleFilter, schoolFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  // Clamp en vez de resetear a 1: si un cambio de filtro deja menos páginas, cae
+  // en la última válida en lugar de quedar en una página vacía.
+  const currentPage = Math.min(page, totalPages)
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const hasFilters = search !== '' || roleFilter !== '' || schoolFilter !== ''
+
+  useEffect(() => { setPage(1) }, [search, roleFilter, schoolFilter])
+
+  function clearFilters() {
+    setSearch('')
+    setRoleFilter('')
+    setSchoolFilter('')
+  }
 
   function handleUserChanged(updated?: User) {
     if (updated) {
@@ -1080,7 +1148,11 @@ export default function SettingsUsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold">Usuarios</h1>
-              <p className="text-sm text-muted-foreground">{users.length} usuarios internos</p>
+              <p className="text-sm text-muted-foreground">
+                {hasFilters
+                  ? `${filtered.length} de ${users.length} usuarios internos`
+                  : `${users.length} usuarios internos`}
+              </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -1107,12 +1179,62 @@ export default function SettingsUsersPage() {
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o email…"
+                className="pl-9"
+              />
+            </div>
+            <select
+              value={schoolFilter}
+              onChange={(e) => setSchoolFilter(e.target.value)}
+              className="h-10 rounded-lg border bg-background px-3 text-sm"
+            >
+              <option value="">Todos los colegios</option>
+              {schoolOptions.map((s) => (
+                <option key={s.public_id} value={s.public_id}>
+                  {s.name}
+                </option>
+              ))}
+              <option value={NO_SCHOOL}>Sin colegio</option>
+            </select>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="h-10 rounded-lg border bg-background px-3 text-sm"
+            >
+              <option value="">Todos los roles</option>
+              {roleOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+              >
+                <X size={14} />
+                Limpiar
+              </button>
+            )}
+          </div>
+
           <div className="rounded-lg border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-4 py-3 text-left font-medium">Nombre</th>
                   <th className="px-4 py-3 text-left font-medium">Email</th>
+                  <th className="px-4 py-3 text-left font-medium">Colegio</th>
                   <th className="px-4 py-3 text-left font-medium">Cargo</th>
                   <th className="px-4 py-3 text-left font-medium">Roles</th>
                   <th className="px-4 py-3 text-left font-medium">Activo</th>
@@ -1121,19 +1243,26 @@ export default function SettingsUsersPage() {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                       Cargando…
                     </td>
                   </tr>
                 )}
                 {!loading && users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                       No hay usuarios
                     </td>
                   </tr>
                 )}
-                {users.map((u) => (
+                {!loading && users.length > 0 && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      Ningún usuario coincide con los filtros
+                    </td>
+                  </tr>
+                )}
+                {visible.map((u) => (
                   <tr
                     key={u.public_id}
                     onClick={() =>
@@ -1147,6 +1276,13 @@ export default function SettingsUsersPage() {
                       {u.first_name} {u.last_name}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {(u.schools ?? []).length === 0 ? (
+                        <span className="italic text-xs">Sin colegio</span>
+                      ) : (
+                        (u.schools ?? []).map((s) => s.name).join(', ')
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {u.position ?? <span className="italic text-xs">Sin cargo</span>}
                     </td>
@@ -1176,6 +1312,30 @@ export default function SettingsUsersPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* User detail panel */}

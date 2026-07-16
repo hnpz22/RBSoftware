@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.identifiers import parse_public_id
 from app.core.security import hash_password, verify_password
 from app.domains.auth.models import User
 from app.domains.auth.repositories import UserRepository
-from app.domains.auth.schemas import UserCreate, UserRead, UserUpdate
+from app.domains.auth.schemas import SchoolBrief, UserCreate, UserRead, UserUpdate
 from app.domains.rbac.repositories import UserRoleRepository
 from app.domains.auth.services.refresh_token_service import RefreshTokenService
 
@@ -64,16 +64,84 @@ class UserService:
     def get_by_public_id(self, session: Session, public_id: UUID) -> User | None:
         return UserRepository(session).get_by_public_id(public_id)
 
+    def _school_affiliations_by_user(
+        self, session: Session
+    ) -> dict[int, list[SchoolBrief]]:
+        """Colegio(s) de cada usuario, para toda la tabla de una vez.
+
+        No existe `users.school_id`: la afiliación se deriva por tres caminos
+        distintos según el rol, así que son tres queries en vez de una. La
+        alternativa (`/academic/users/{id}/school-affiliation`) es una llamada
+        por usuario.
+
+        Solo cuentan las afiliaciones ACTIVAS: un estudiante al que se le dio de
+        baja la matrícula (el reinicio de ciclo hace `is_active=false` en masa)
+        no sigue perteneciendo a su colegio anterior. Queda sin colegio, que es
+        el estado real.
+        """
+        # Diferido: academic importa auth, a nivel de módulo sería circular.
+        from app.domains.academic.models.lms_course import LmsCourse
+        from app.domains.academic.models.lms_course_student import LmsCourseStudent
+        from app.domains.academic.models.lms_grade import LmsGrade
+        from app.domains.academic.models.lms_grade_director import LmsGradeDirector
+        from app.domains.academic.models.school import School
+        from app.domains.academic.models.school_teacher import SchoolTeacher
+
+        pairs: set[tuple[int, int]] = set()  # (user_id, school_id)
+
+        # Docentes. OJO: school_teachers es MEMBRESÍA, no rol — trae también
+        # estudiantes. No filtramos por rol acá a propósito: esto responde "a qué
+        # colegio pertenece", y el rol se resuelve aparte desde user_roles.
+        pairs.update(
+            session.exec(select(SchoolTeacher.user_id, SchoolTeacher.school_id)).all()
+        )
+
+        # Directores: el colegio cuelga del grado.
+        pairs.update(
+            session.exec(
+                select(LmsGradeDirector.user_id, LmsGrade.school_id)
+                .join(LmsGrade, LmsGrade.id == LmsGradeDirector.grade_id)
+                .where(LmsGradeDirector.is_active == True)  # noqa: E712
+            ).all()
+        )
+
+        # Estudiantes: lms_courses ya tiene school_id, sin pasar por el grado.
+        pairs.update(
+            session.exec(
+                select(LmsCourseStudent.user_id, LmsCourse.school_id)
+                .join(LmsCourse, LmsCourse.id == LmsCourseStudent.course_id)
+                .where(LmsCourseStudent.is_active == True)  # noqa: E712
+            ).all()
+        )
+
+        schools = {
+            s.id: SchoolBrief(public_id=s.public_id, name=s.name)
+            for s in session.exec(select(School)).all()
+        }
+
+        by_user: dict[int, list[SchoolBrief]] = {}
+        for user_id, school_id in pairs:
+            school = schools.get(school_id)
+            if school is None:
+                continue
+            by_user.setdefault(user_id, []).append(school)
+        for briefs in by_user.values():
+            briefs.sort(key=lambda s: s.name)
+        return by_user
+
     def list_users(self, session: Session) -> list[UserRead]:
         users = UserRepository(session).list()
-        role_repo = UserRoleRepository(session)
-        result = []
-        for user in users:
-            role_names = role_repo.get_role_names_for_user(user.id)
-            result.append(
-                UserRead.model_validate(user).model_copy(update={"roles": role_names})
+        roles_by_user = UserRoleRepository(session).get_role_names_by_user()
+        schools_by_user = self._school_affiliations_by_user(session)
+        return [
+            UserRead.model_validate(user).model_copy(
+                update={
+                    "roles": roles_by_user.get(user.id, []),
+                    "schools": schools_by_user.get(user.id, []),
+                }
             )
-        return result
+            for user in users
+        ]
 
     def update_user(
         self,

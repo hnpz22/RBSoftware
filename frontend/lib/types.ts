@@ -1,3 +1,8 @@
+export interface SchoolBrief {
+  public_id: string
+  name: string
+}
+
 export interface User {
   public_id: string
   email: string
@@ -9,6 +14,8 @@ export interface User {
   created_at: string
   updated_at: string
   roles: string[]
+  /** Vacío para quien no tiene colegio (ADMIN, TRAINER…). Un docente puede tener varios. */
+  schools?: SchoolBrief[]
 }
 
 export interface Product {

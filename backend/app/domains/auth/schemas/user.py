@@ -17,6 +17,13 @@ class UserCreate(SQLModel):
     is_active: bool = True
 
 
+class SchoolBrief(SQLModel):
+    """Colegio al que un usuario está afiliado, para pintar y filtrar la lista."""
+
+    public_id: UUID
+    name: str
+
+
 class UserRead(SQLModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -30,6 +37,9 @@ class UserRead(SQLModel):
     created_at: datetime
     updated_at: datetime
     roles: list[str] = []
+    # Vacío para quien no tiene colegio (ADMIN, TRAINER…) y para quien perdió su
+    # única afiliación activa. Un docente puede estar en varios.
+    schools: list[SchoolBrief] = []
 
 
 class UserUpdate(SQLModel):

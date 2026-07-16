@@ -5,9 +5,10 @@ from app.domains.auth.schemas.refresh_token import (
     RefreshTokenRead,
     RefreshTokenUpdate,
 )
-from app.domains.auth.schemas.user import UserCreate, UserRead, UserUpdate
+from app.domains.auth.schemas.user import SchoolBrief, UserCreate, UserRead, UserUpdate
 
 __all__ = [
+    "SchoolBrief",
     "UserCreate",
     "UserRead",
     "UserUpdate",

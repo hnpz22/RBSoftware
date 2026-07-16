@@ -50,6 +50,20 @@ class UserRoleRepository:
         )
         return list(self.session.exec(statement).all())
 
+    def get_role_names_by_user(self) -> dict[int, list[str]]:
+        """Roles de todos los usuarios en una query.
+
+        Para listados. Llamar a `get_role_names_for_user` en un bucle es una
+        query por usuario.
+        """
+        rows = self.session.exec(
+            select(UserRole.user_id, Role.name).join(Role, Role.id == UserRole.role_id)
+        ).all()
+        by_user: dict[int, list[str]] = {}
+        for user_id, role_name in rows:
+            by_user.setdefault(user_id, []).append(role_name)
+        return by_user
+
     def set_user_roles(self, user_id: int, role_ids: list[int]) -> None:
         """Reemplaza atómicamente el conjunto de roles del usuario.
 
