@@ -496,12 +496,8 @@ class AcademicService:
         if grade is None:
             raise LookupError("Grade not found")
 
-        director_grades = GradeDirectorRepository(session).get_grades_for_director(
-            teacher_id
-        )
-        if director_grades:
-            raise ValueError("Teacher cannot be a director")
-
+        # Un director puede dictar cursos: en RobotSchool la misma persona
+        # coordina un grado y tiene curso a cargo.
         course = CourseRepository(session).create(
             grade_id, grade.school_id, teacher_id, data
         )
@@ -537,12 +533,8 @@ class AcademicService:
 
         self._assert_admin_or_director(session, course.grade_id, requesting_user_id)
 
-        director_grades = GradeDirectorRepository(session).get_grades_for_director(
-            teacher_id
-        )
-        if director_grades:
-            raise ValueError("Teacher cannot be a director")
-
+        # Un director puede dictar cursos: en RobotSchool la misma persona
+        # coordina un grado y tiene curso a cargo.
         course = CourseRepository(session).set_teacher(course, teacher_id)
 
         _audit.log(
