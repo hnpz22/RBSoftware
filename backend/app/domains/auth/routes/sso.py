@@ -48,15 +48,20 @@ def _validate_token(token: str, jwks: list[dict]) -> dict:
     try:
         header = jwt.get_unverified_header(token)
         kid = header.get("kid")
-        key = next((k for k in jwks if k.get("kid") == kid), jwks[0] if jwks else None)
-        if not key:
-            raise JWTError("no matching key in JWKS")
-        claims = jwt.decode(
-            token,
-            key,
-            algorithms=["RS256"],
-            options={"verify_aud": False, "verify_at_hash": False},
-        )
+        # Match ESTRICTO por kid: sin fallback a jwks[0]. Un kid que no está en
+        # el JWKS se rechaza (el auth siempre publica el kid con el que firma;
+        # si rotó la clave, el caller limpia la caché y el reintento la refresca).
+        key = next((k for k in jwks if k.get("kid") == kid), None)
+        if key is None:
+            raise JWTError(f"ningún kid del JWKS coincide (kid={kid!r})")
+        decode_kwargs: dict = {
+            "algorithms": ["RS256"],
+            "audience": settings.sso_audience,   # verifica aud (rechaza access tokens)
+            "options": {"verify_at_hash": False},
+        }
+        if settings.sso_issuer:
+            decode_kwargs["issuer"] = settings.sso_issuer  # verifica iss si está configurado
+        claims = jwt.decode(token, key, **decode_kwargs)
     except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
