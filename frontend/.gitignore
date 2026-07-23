@@ -1,2 +1,6 @@
 .next
 node_modules
+
+# Artefacto de caché incremental de tsc: cambia en cada typecheck y ensucia
+# el diff de cualquier PR donde alguien haya corrido el compilador.
+tsconfig.tsbuildinfo
