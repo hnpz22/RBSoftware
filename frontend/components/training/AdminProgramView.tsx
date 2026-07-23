@@ -1733,7 +1733,10 @@ interface AssignRepositoryModalProps {
   onSelect?: (file: RepoFile) => void
 }
 
-const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'avi', 'mkv']
+// Espejo de LESSON_FILE_EXTENSIONS['VIDEO'] en el backend: son los formatos que
+// el visor reproduce. Ofrecer .mov/.avi aquí sería un callejón sin salida — el
+// picker los listaría y el servidor los rechazaría con 400 al guardar.
+const VIDEO_EXTS = ['mp4', 'webm']
 
 export function AssignRepositoryModal({
   programId,
